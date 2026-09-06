@@ -1,0 +1,11 @@
+{
+  "id": "film",
+  "name": "影片制作",
+  "version": "0.1.0",
+  "category": "media",
+  "icon": "clapperboard",
+  "description": "AI 影片管线：创意 → 剧本分镜 → 分镜图 → 图生视频 → 配音 → BGM → 合成成片",
+  "entry": "web/entry.js",
+  "engine": "film",
+  "sdk": "^0.1"
+}

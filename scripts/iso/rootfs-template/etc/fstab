@@ -1,0 +1,19 @@
+# /etc/fstab —— OS System 根文件系统挂载点骨架
+# 由 build-iso.sh 在 squashfs 打包前注入；安装到目标盘后由 installer 重写。
+#
+# 字段：<spec> <mount> <type> <opts> <dump> <pass>
+# Live/Install 阶段：根由 casper 从 squashfs 加载（overlay），这里仅声明
+# OS 数据卷（ZFS 池）的挂载点骨架。
+
+# 根文件系统（Live 模式由 casper 注入，这里留空占位）。
+# overlay / overlay defaults 0 0
+
+# ZFS 池挂载点骨架（installer 按 pool/dataset 自动展开）。
+# tank          /tank           zfs    defaults,zfsutil           0 0
+# tank/data     /tank/data      zfs    defaults,zfsutil           0 0
+# tank/share    /tank/share     zfs    defaults,zfsutil,noexec    0 0
+# tank/backup   /tank/backup    zfs    defaults,zfsutil           0 0
+
+# 临时 / 运行时（systemd 自动管理，列于此仅供文档参考）。
+tmpfs           /tmp            tmpfs  defaults,nosuid,nodev      0 0
+tmpfs           /run            tmpfs  defaults,nosuid,nodev      0 0

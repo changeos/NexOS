@@ -1,0 +1,38 @@
+[package]
+name = "os-iso"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 可安装 ISO 打包 + Rust 安装器（标准/克隆变体，见规划文档 §3.11 / §3.19）（接口契约）"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+# binary 入口（main.rs）需 macros（#[tokio::main]）+ rt-multi-thread。workspace tokio
+# 已开 full（含二者），此处显式标注 binary 所需 feature 以明意图（去耦 workspace 改动）。
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tracing.workspace = true
+async-trait.workspace = true
+os-core.workspace = true
+os-common.workspace = true
+# binary 入口（main.rs）命令行参数解析（clap derive）。workspace 已注册（osd/os-cli 同款）。
+clap.workspace = true
+
+# binary 入口：os-iso-install 安装器可执行（ISO Live 环境裸机安装，规格书 §3.11 / §3.19）。
+[[bin]]
+name = "os-iso-install"
+path = "src/main.rs"
+
+[features]
+# 提供 MockIsoBuilder / MockInstaller，供下游 update-agent / api-agent 测试注入
+# （见 _conventions.md §5）。用法：[dev-dependencies] os-iso = { workspace = true, features = ["mock"] }
+default = []
+mock = []
+
+[dev-dependencies]
+serde_json.workspace = true
+tokio.workspace = true

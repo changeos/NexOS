@@ -1,0 +1,130 @@
+# syntax=docker/dockerfile:1.7
+#
+# OS System —— 真实环境测沙箱镜像（方案 A：Docker privileged + systemd + cgroup v2）
+# =============================================================================
+#
+# 目的：在容器内以 root + privileged + cgroup v2 + systemd 跑那些单元测/CI 跑不了
+# 的"真内核 / 真守护"操作——osd 写 /sys/fs/cgroup、os-storage 真 zpool/zfs、
+# os-network/os-guest 真 nftables、os-compute libvirt test:///default。
+# 详见 docs/SANDBOX.md §2（方案 A）。
+#
+# 镜像 = Ubuntu 26.04 base + 系统库（libvirt-dev/libnftnl-dev/ZFS）+ Rust stable
+# + systemd 作 PID1。运行期需 `docker run --privileged --cgroupns=host
+# -v /sys/fs/cgroup:/sys/fs/cgroup:rw`（见 scripts/sandbox/docker/run-tests.sh
+# 顶部注释的 docker run 模板）。
+#
+# 红线：本镜像只装运行环境，**不打包仓库源码**——源码经 `-v $PWD:/workspace` 挂入，
+# 保证镜像版本与仓库解耦。本镜像只动 docs/scripts（不动源码）。
+#
+# 构建：
+#   docker build -t os-sandbox:26.04 \
+#     -f scripts/sandbox/docker/Dockerfile.test scripts/sandbox/docker
+#
+# 运行（容器内 PID1 = systemd）：
+#   docker run --rm -it --privileged --cgroupns=host \
+#     -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+#     -v "$PWD":/workspace:rw -w /workspace os-sandbox:26.04
+#
+# 注：Ubuntu 26.04「Resolute Raccoon」镜像 tag 为 ubuntu:26.04。
+# 如该 tag 在你的环境暂不可用，可临时退回 ubuntu:25.04（plucky，cgroup v2/ZFS 同样支持）。
+
+FROM ubuntu:26.04 AS base
+
+# 避免 apt 交互卡构建；强制 UTC（与 chrony/CAP_SYS_TIME 测一致）。
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=UTC \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+# ---- 系统包：systemd + 内核设施 + 各 crate FFI 前置依赖 ----
+# systemd：容器内作 PID1（unit 生成/进程监管/cgroup 绑定 —— osd SystemdOrchestrator）。
+# cgroup-tools / libcgroup：cgroup v2 探查 + 写入辅助（osd CgroupsRsBackend）。
+# zfsutils-linux：zpool/zfs CLI（os-storage ZfsCliBackend，loop 设备建池）。
+# libnftnl-dev + libmnl-dev + nftables：os-guest/os-network nftnl-ffi feature 编译 + 运行。
+# libvirt-dev：os-compute virt-ffi feature 编译（pkg-config 找 libvirt.pc）。
+# libvirt-clients / virtinst：virsh 调试 + test:///default 驱动（无 KVM 也能跑）。
+# iproute2 / bridge-utils / vlan / dnsmasq：os-network rtnetlink/桥/VLAN/DHCP 真实操作。
+# chrony：osd ChronyNtp（待实现；装上后 NTP 集成测可跑）。
+# curl / ca-certificates / pkg-config / build-essential：编译期通用。
+# dbus / udev：systemd 在容器内运行所需。
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        systemd \
+        systemd-sysv \
+        dbus \
+        udev \
+        cgroup-tools \
+        libcgroup1 \
+        zfsutils-linux \
+        zfs-dkms \
+        libnftnl-dev \
+        libmnl-dev \
+        nftables \
+        libvirt-dev \
+        libvirt-clients \
+        virtinst \
+        iproute2 \
+        bridge-utils \
+        vlan \
+        dnsmasq \
+        chrony \
+        curl \
+        ca-certificates \
+        pkg-config \
+        build-essential \
+        git \
+        locales \
+        sudo \
+        kmod \
+        procps \
+        less \
+        vim-tiny \
+    && locale-gen C.UTF-8 \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- Rust 工具链：固定 stable（与 .github/workflows/ci.yml 对齐） ----
+# 用 rustup 官方安装器；装到 /opt/rust（容器内全局可用）。
+ENV RUSTUP_HOME=/opt/rust/rustup \
+    CARGO_HOME=/opt/rust/cargo \
+    PATH=/opt/rust/cargo/bin:$PATH \
+    RUST_BACKTRACE=short \
+    CARGO_TERM_COLOR=always
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --profile minimal --default-toolchain stable \
+               --component clippy rustfmt \
+    && rustup --version && cargo --version && rustc --version
+
+# sccache 加速重复编译（与 ci.yml 缓存策略一致）。
+RUN curl --proto '=https' --tlsv1.2 -sSfL \
+      https://github.com/mozilla/sccache/releases/latest/download/sccache-v0.8.0-x86_64-unknown-linux-musl.tar.gz \
+    | tar -xz --strip-components=1 -C /opt/rust/cargo/bin \
+         sccache-v0.8.0-x86_64-unknown-linux-musl/sccache \
+    && chmod +x /opt/rust/cargo/bin/sccache \
+    && sccache --version || true
+ENV RUSTC_WRAPPER=sccache \
+    SCCACHE_DIR=/workspace/.cache/sccache
+
+# ---- systemd-in-Docker 适配 ----
+# 容器以 systemd 作 PID1 时，需屏蔽宿主 units 干扰 + 拉起 dbus。
+# 参考 jrei/systemd-ubuntu 等社区镜像做法。
+RUN find /lib/systemd/system /etc/systemd/system \
+        -path /lib/systemd/system/systemd-update-utmp* -delete 2>/dev/null || true; \
+    systemctl mask systemd-update-utmp-run.service \
+                    systemd-update-utmp.service \
+                    systemd-journald-audit.socket \
+                    dev-mqueue.mount \
+                    sys-fs-fuse-connections.mount 2>/dev/null || true
+
+# chrony 默认 systemd unit 假定真实硬件时钟；沙箱内仅作 NTP 编排对象，关闭自动起
+# （让 osd 自己拉起，模拟生产）。
+RUN systemctl disable chrony.service 2>/dev/null || true
+
+# 工作目录（仓库经 -v 挂入；镜像本身不含源码）。
+WORKDIR /workspace
+RUN mkdir -p /workspace/.cache
+
+# 容器入口 = systemd（PID1）。测试用：
+#   docker run ... os-sandbox:26.04            # 进 systemd，再 exec 进容器跑脚本
+#   docker run ... os-sandbox:26.04 /workspace/scripts/sandbox/docker/run-tests.sh
+# 注：privileged + cgroupns=host 时 systemd 才能正常拉起 cgroup 树。
+CMD ["/sbin/init"]

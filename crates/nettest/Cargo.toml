@@ -1,0 +1,74 @@
+[package]
+name = "nettest"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+description = "临时验证 crate：真实验证 reqwest/axum/mdns-sd/rustls + zfs/rtnetlink/nftnl 在本机的真实执行层（所有真实环境测均 #[ignore]）"
+
+# 说明：
+# 本 crate 是临时的连通性回归测，不是产品 crate。dev-dependencies 直接引用
+# reqwest/axum/mdns-sd/rustls/reqwest/rustls/tokio/rtnetlink/nftnl 等第三方库
+# （workspace 根已注册，nftnl 因 FFI 门控为 optional），用以验证 OS 系统选定的
+# 网络栈 + 存储执行层 + 网络执行层能在本机真实跑通（之前所有网络相关 crate 的测试
+# 都用 fixture/loopback，从未验证真实网络层；os-storage/os-network 的真实测只
+# 在各自 crate 内、本 crate 补一个跨执行层的统一真机回归入口）。所有真实环境测试
+# 均标记 #[ignore]，默认 `cargo test` 不执行，需手动 `cargo test -p nettest -- --ignored`。
+
+[dependencies]
+# nettest 是纯验证 crate（无产品代码，src/lib.rs 仅一个占位 smoke 测 + 文档）。
+# 下面三个 optional 依赖仅被对应的集成测目标（tests/*_real.rs）引用，且 nftnl/mnl
+# 整文件在 `#![cfg(feature = "nftnl-ffi")]` 门控下。之所以放 [dependencies] 而非
+# [dev-dependencies]：Cargo 不允许 dev-dependencies 带 `optional = true`（dev-deps
+# 不参与 feature 解析）。把它们当 optional 正常依赖注册 + feature 门控，效果与
+# 「optional dev-dep」一致——不开 feature 时不进编译产物，不影响 lib/默认套件。
+
+# 真实 nftables 事务（FFI：libnftnl/libmnl，需 -dev 头才能编译）。
+# 缺 -dev 头时 `cargo test --features nftnl-ffi` 编译失败——这是预期门控（与
+# os-network 一致，详见 docs/SANDBOX.md §5.3）。不开 feature 时 nftnl_real.rs
+# 整体 cfg 掉，不污染默认套件。
+nftnl = { workspace = true, optional = true }
+# mnl：libmnl FFI 高层封装（nftnl finalized batch 经 netlink socket 发送所需）。
+# 与 nftnl 共存亡：同 FFI 依赖（libmnl-dev），故同在 `nftnl-ffi` feature 下启用。
+mnl = { workspace = true, optional = true }
+genetlink = "0.2"
+netlink-packet-core = "0.8"
+netlink-packet-generic = "0.4"
+
+[dev-dependencies]
+# 异步运行时（real net test 都在 tokio runtime 内跑）。
+tokio = { workspace = true, features = ["full"] }
+# HTTP 客户端：rustls-tls 栈（与 os-mobile/os-wallet/os-update 一致）。
+reqwest.workspace = true
+# HTTP 服务端：真实监听端口（与 os-api/os-guest 一致）。
+axum.workspace = true
+tokio-rustls = "0.26"
+# mDNS 服务发现（与 os-discover 一致）。
+mdns-sd.workspace = true
+# rustls TLS 栈（与 reqwest rustls-tls / os-discover mTLS 共栈）。
+rustls.workspace = true
+# 自签证书生成（与 os-security 一致，用于 rustls 真实 TLS 握手测试）。
+rcgen.workspace = true
+hyper.workspace = true
+tower.workspace = true
+# JSON 解析（reqwest_real_get 校验 httpbin 响应）。
+serde_json.workspace = true
+# 自定义 CA 信任（rustls 客户端侧）。
+# （rustls 默认无 root，需手动注入 ServerConfig，无需 webpki-roots。）
+
+# —— 真实执行层验证（zfs 子进程 / rtnetlink）——
+# 真实 rtnetlink 接口查询（纯 Rust netlink 绑定，无系统库 FFI 依赖；调用时需 root/
+# CAP_NET_ADMIN，但编译无门控）。用于 rtnetlink_real 测（断言至少有 lo）。
+rtnetlink = { workspace = true }
+# futures：rtnetlink 流式 API（try_next）所需。
+futures = { workspace = true }
+
+[features]
+default = []
+# 真实 nftables 执行层（FFI）：启用后 nftnl_real.rs 集成测进入编译，
+# 需宿主装 `libnftnl-dev` + `libmnl-dev`（pkg-config 找 `.pc`）。沙箱镜像已覆盖；
+# 普通开发机/CI 默认不开（缺 -dev 头时门控为编译失败）。与 os-network `nftnl-ffi`
+# feature 同名同义，保持跨 crate 语义一致。
+nftnl-ffi = ["dep:nftnl", "dep:mnl"]

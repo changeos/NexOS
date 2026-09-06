@@ -1,0 +1,23 @@
+[package]
+name = "os-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 系统 core：领域 ID/类型/模型 + EventBus trait（基础层，无业务依赖）"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+
+[features]
+# 提供 MockEventBus，供下游 crate 单元测/集成测注入（见 _conventions.md §5）。
+# 用法：`os-core = { workspace = true, features = ["mock"] }`（仅 [dev-dependencies]）。
+default = []
+mock = []

@@ -1,0 +1,60 @@
+[package]
+name = "os-guest"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 系统访客接入管理：Captive Portal + 访客身份 + RBAC + nftables 编排 + 链上凭证编排（见规划文档 §3.18）"
+
+[features]
+# 提供 5 个 Mock（MockCaptivePortal / MockIdentityEngine / MockPolicyEngine /
+# MockNftRuleOrchestrator / MockChainOrchestrator），供下游 api-agent 单测注入
+# （见 _conventions.md §5）。用法：
+#   os-guest = { workspace = true, features = ["mock"] }（仅 [dev-dependencies]）。
+default = []
+mock = []
+# 真实 nftables 事务（nftnl netlink 绑定）。需要系统库 libnftnl-dev + libmnl-dev：
+#   apt install libnftnl-dev libmnl-dev
+# （ADR-DEPS-001 §91）。未启用时 NftRuleOrchestratorImpl 的 apply/revoke/rollback
+# 退回内存态（保持 cargo check/test 在无 FFI 环境下可跑），见 impls.rs 的 `#[cfg]` 门控。
+# 与 os-network 同源：nftnl 0.7 的 re-export 仅含 nftnl-sys（无 mnl_socket），故 finalized
+# batch 的 netlink 投递走独立 mnl crate（Socket::new / send_all / cb_run）。
+nftnl-ffi = ["dep:nftnl", "dep:mnl"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+os-core.workspace = true
+os-common.workspace = true
+os-network.workspace = true
+os-security.workspace = true
+os-wallet.workspace = true
+# P0/P1 第三方依赖（ADR-DEPS-001）——本批接通真实实现：
+# - axum：HttpCaptivePortal 真实 HTTP 监听（落地页/注册/探测兼容路由）
+# - reqwest：Captive Portal 自检/外部认证回调客户端
+# - nftnl：NftRuleOrchestratorImpl 真实 nftables netlink 事务（FFI；feature 门控，见上）
+axum.workspace = true
+tower.workspace = true
+hyper.workspace = true
+reqwest.workspace = true
+nftnl = { workspace = true, optional = true }
+# mnl：libmnl FFI 高层封装（nftnl finalized batch 经 netlink socket 发送所需）。
+# 与 nftnl 共存亡：同 FFI 依赖（libmnl-dev），同在 nftnl-ffi feature 下启用。
+mnl = { workspace = true, optional = true }
+# os-im 为运行时依赖（Guest 成员/自动入群），trait 层暂不直接依赖；
+# 待 os-im 提供成员/群组类型后，由实现层注入。
+
+[dev-dependencies]
+# 测试期启用上游 mock（wallet/security/network）与本 crate mock feature，
+# 便于内部单测直接复用 MockXxx 注入编排器。
+os-wallet = { workspace = true, features = ["mock"] }
+os-security = { workspace = true, features = ["mock"] }
+os-network = { workspace = true, features = ["mock"] }
+os-guest = { workspace = true, features = ["mock"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+# axum 测试工具：tower::ServiceExt::oneshot 对 Router 离线发起单请求（不真监听端口）。
+tower = { workspace = true, features = ["util"] }

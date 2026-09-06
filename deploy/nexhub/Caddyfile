@@ -1,0 +1,56 @@
+# =============================================================================
+# NexHub 公开大厅 · 反向代理模板（Caddy，TLS 终止）
+# =============================================================================
+#
+# 适用场景：大厅「公开 + 付费」（货币化 §10）时，反代从「可选」升级为「必需」——
+# 付费流程要传 buyer 身份、支付收据 txid、admin token 等敏感凭据，明文 http://:8080
+# 在公网等于裸奔。Caddy 一行 reverse_proxy + 自动 HTTPS 即可零代码收口。
+#
+# 前置：
+#   - 安装 Caddy：https://caddyserver.com/docs/install
+#   - 域名（如 nexhub.example.com）A/AAAA 已解析到本机公网 IP
+#   - 防火墙放行 80/443（ACME 挑战 + 服务）
+#
+# 运行：将本文件放到 /etc/caddy/Caddyfile 后 `caddy reload`（或 `caddy run`）
+#
+# 关键约束：os-api 仍只监听内网 127.0.0.1:8080（绝不暴露 0.0.0.0:8080 到公网），
+#          所有公网流量经 Caddy TLS 终止后转发。这样 token 只在 Caddy↔os-api 这段
+#          内网明文，公网全程加密。
+# =============================================================================
+
+nexhub.example.com {
+    # 自动 HTTPS（Caddy 内置 ACME，免费证书，零配置）
+    encode zstd gzip
+
+    # —— 限流（防刷量；付费克隆是真实成本动作）——
+    # 注意：原生 Caddy 无 rate_limit，需要 caddy-ratelimit 插件
+    # （github.com/mholt/caddy-ratelimit）。社区版 caddy 自带则取消下行注释：
+    # rate_limit {
+    #     zone lobby
+    #     events 20
+    #     window 1m
+    # }
+
+    # —— 静态资源缓存（大厅卡片 / README 摘要由 os-api rust-embed 提供）——
+    @static path /static/* /git/*/static/*
+    header @static Cache-Control "public, max-age=3600"
+
+    # —— 大厅 API + 静态资源 + Smart Git(/git/*) 全部反代到单体 os-api ——
+    reverse_proxy localhost:8080 {
+        # 流式转发 git 智能 HTTP（大文件/克隆不缓冲，实时透传）
+        flush_interval 100ms
+        # 健康检查：大厅 stats 接口可达即视为活着
+        health_uri /api/v1/nexhub/lobby/stats
+        health_interval 30s
+        # 失败时返回友好 503（而非连接拒绝）
+        @bad_gateway status 502 503
+        handle_response @bad_gateway {
+            respond "NexHub 暂不可用，请稍后重试" 503
+        }
+    }
+}
+
+# =============================================================================
+# 纯内网 / 单机 / 仅免费分享：不需要本文件。
+# os-api 直接监听 8080，客户端走 http://<内网IP>:8080 即可。
+# =============================================================================

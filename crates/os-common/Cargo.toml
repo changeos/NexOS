@@ -1,0 +1,30 @@
+[package]
+name = "os-common"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 系统 common：ApiError（统一错误码）/ DTO schema / Versioned trait"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+# gateway 契约模块（NexHub 独立化）：RouteHandler trait 需 dyn 兼容的 async trait
+# （ADR-COMPAT-001，与 os-api 网关同款选型）。
+async-trait.workspace = true
+os-core.workspace = true
+# now_secs（chain_auth nonce/token 桶的时间戳与 TTL 判定，unix 秒）。
+chrono.workspace = true
+# 链上身份认证内核（chain_auth，设计 docs/MEDIA_GEN_AND_CHAIN_AUTH.md §C）：
+# k256 secp256k1 验签/压缩公钥解析 + tiny-keccak keccak256（EVM 地址展示名派生）
+# + hex 编解码。与 os-api blockchain 钱包同栈（workspace 根已注册，无新版本引入）。
+# 随机数（nonce/token）经 k256 重导出的 elliptic_curve::rand_core::OsRng，无需独立 rand。
+k256.workspace = true
+tiny-keccak.workspace = true
+hex.workspace = true
+
+[dev-dependencies]
+# 链上认证测试：客户端签名辅助 SHA-256(nonce) → ECDSA（与 os-api im.rs 测试同构）。
+sha2.workspace = true

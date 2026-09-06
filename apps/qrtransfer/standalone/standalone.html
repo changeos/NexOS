@@ -1,0 +1,22 @@
+<!doctype html>
+<!-- =============================================================================
+     standalone.html —— 二维码传输「独立全页运行」入口（脱离 NexOS 桌面壳）。
+
+     服务路径：/apps-assets/qrtransfer/standalone.html（= 安装目录 web/standalone.html）。
+     脚本引用相对 ./web/standalone-host.js → /apps-assets/qrtransfer/web/standalone-host.js
+     （静态托管兼容剥前导 web/ 段，docs/APPS.md §5.5，两种写法等价同指 web/ 下文件）。
+     本页 + standalone-host.js 自给自足：vue / vue-i18n 已完整打进宿主桥，
+     内网离线可跑，不引任何 CDN。
+============================================================================= -->
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>二维码传输 · NexOS</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./web/standalone-host.js"></script>
+  </body>
+</html>

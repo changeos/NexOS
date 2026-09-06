@@ -1,0 +1,43 @@
+# os-i18n 繁體中文資源（zh_tw）—— 系統通用鍵骨架
+#
+# 格式約定見 en.toml 頂部說明。業務鍵由各 crate 貢獻補充。
+
+[error]
+internal = "內部錯誤"
+not_found = "找不到：{name}"
+permission_denied = "權限不足"
+invalid_input = "輸入無效：{field}"
+disk_failed = "磁碟 {name} 故障"
+network_unreachable = "網路不可達：{host}"
+timeout = "操作逾時"
+unauthorized = "未授權"
+conflict = "衝突：{name}"
+service_unavailable = "服務不可用"
+
+[common]
+ok = "確定"
+cancel = "取消"
+confirm = "確認"
+save = "儲存"
+delete = "刪除"
+edit = "編輯"
+create = "建立"
+retry = "重試"
+loading = "載入中..."
+yes = "是"
+no = "否"
+name = "名稱"
+status = "狀態"
+actions = "操作"
+description = "描述"
+
+[pool]
+created = "儲存池 {name} 已建立"
+destroyed = "儲存池 {name} 已銷毀"
+not_found = "儲存池 {name} 不存在"
+already_exists = "儲存池 {name} 已存在"
+started = "儲存池 {name} 已啟動"
+stopped = "儲存池 {name} 已停止"
+degraded = "儲存池 {name} 處於降級狀態"
+scrub_started = "已開始對儲存池 {name} 執行校驗"
+scrub_finished = "儲存池 {name} 校驗完成"

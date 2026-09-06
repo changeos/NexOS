@@ -1,0 +1,330 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/os-core",
+    "crates/os-common",
+    "crates/os-i18n",
+    "crates/osd",
+    "crates/os-storage",
+    "crates/os-network",
+    "crates/os-security",
+    "crates/os-protocols",
+    "crates/os-compute",
+    "crates/os-wallet",
+    "crates/os-meta",
+    "crates/os-discover",
+    # os-p2p：点对点组网层（Swarm 同款全分布式 Kademlia + NAT 中继 + 冷启动
+    # walk，设计 docs/NEXOS_P2P_NETWORK_DESIGN.md P1）。身份复用 os-common
+    # chain_auth 的 secp256k1 密钥学；不依赖 os-discover（mDNS 种子 P2 接入）。
+    # 指纹账本与对比已抽到 os-identity（传输层只发事实事件，账本/策略外移）。
+    "crates/os-p2p",
+    # os-identity：身份账本独立组件——指纹（NodeID↔地址）证据登记 + 对比判定
+    # + 冲突/失配观测 + JSON 持久化（2026-08-25 从 os-p2p 抽离，用户定调
+    # 「指纹对比单独做一个组件，不要集成在 p2p 里面」）。纯库无 IO 依赖，
+    # 架构 docs/IDENTITY_COMPONENT.md。
+    "crates/os-identity",
+    "crates/os-guest",
+    "crates/os-provision",
+    "crates/os-iso",
+    "crates/os-update",
+    "crates/os-im",
+    "crates/os-api",
+    # os-nexhub：NexHub（代码仓库中心 + 大厅发现层）两大 RouteHandler 的独立
+    # crate——从 os-api 抽离（审计 docs/COMPONENT_INDEPENDENCE_AUDIT.md §6），
+    # 经 os-common 网关契约对接、os-api 装配层桥接注册。详见 crates/os-nexhub/README。
+    "crates/os-nexhub",
+    "crates/os-services",
+    "crates/os-cli",
+    "crates/os-mobile",
+    "crates/os-desktop",
+    # os-mcp：把 os-api HTTP 网关暴露为 MCP tools（stdio JSON-RPC 2.0），
+    # 让支持 MCP 协议的 AI 助手（Claude / ChatGPT 等）通过 tools/list + tools/call
+    # 管理 OS（查池 / 数据集 / 快照 / VM / 共享 / 用户 / 节点 / 系统状态 ...）。
+    # 详见 crates/os-mcp/README。
+    "crates/os-mcp",
+    # 临时验证 crate：真实验证 reqwest/axum/mdns-sd/rustls 在本机的网络栈连通性。
+    # 所有真实网络测均 #[ignore] 标记（默认不跑，手动 `cargo test -- --ignored`），
+    # 不参与 CI 与正常测试。详见 crates/nettest/README 注释。
+    "crates/nettest",
+    # 跨 crate 端到端集成测骨架（integration-agent 拥有；dev-dependencies 引用全部 22 crate）。
+    "crates/os-integration",
+]
+
+# ============================================================================
+# 接口契约协议（Contract-First）工作区
+# ============================================================================
+# 本 workspace 仅定义 trait + 数据结构 + Error，不含实现（实现由 owner agent
+# 后续填充）。详见主规划文档 §15「接口契约索引」与 §13.2「Contract-First」。
+#
+# 全局契约规范（所有 crate 一致，详见 §15.1）：
+#   - 异步模型：默认用原生 `async fn in trait`（无 #[async_trait]）；
+#               凡需 `Box<dyn XxxTrait>` 运行期多态的 async trait，用 #[async_trait]
+#               （dyn 兼容性修正，见 os-core EventSubscriber / os-im Agent）；
+#               管理/配置 trait 用同步 fn
+#   - 错误模型：每 crate 自定义 thiserror Error；跨 crate 用 Result<T, Self::Error>
+#   - ID 规范：领域 ID 用 newtype（os-core::ids）
+#   - API 版本：对外 DTO 带 api_version: u16（呼应 §12.3）
+# ============================================================================
+
+[workspace.package]
+version = "0.1.35"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+# 仓库唯一 clone 地址（本仓 Gitea/自托管实例）。各 crate 经
+# `repository.workspace = true` 自动继承，保证 crates.io 元数据/审计
+# （docs/COMPONENT_INDEPENDENCE_AUDIT.md P0）与 source 链接一致。
+repository = "http://ub2604:8080/git/nexos.git"
+rust-version = "1.75"  # async fn in trait 稳定线
+
+[workspace.dependencies]
+# 基础
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+anyhow = "1"
+bytes = { version = "1", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+# 异步
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+# 日志/可观测
+tracing = "0.1"
+# tracing-subscriber：tracing 生态的 Subscriber 实现层（Layer 组合 + env-filter
+# 动态过滤 + JSON 格式化输出）。os-services(monitor) 的 tracing 日志桥接
+# （采集层：Layer → 内存 buffer → LogEntry）与 JSON 文件导出（fmt::format::Json）
+# 依赖此 crate。feature：
+#   - `env-filter`：RUST_LOG 风格的运行时过滤指令（如 `info,os_storage=debug`）。
+#   - `json`：JSON 格式日志输出（供 monitor JSON 文件导出骨架）。
+# 版本 0.3 是与 tracing 0.1 配套的稳定主线（tracing 生态版本同步约定）。
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# ----------------------------------------------------------------------------
+# P0/P1 第三方依赖（ADR-DEPS-001）
+# ----------------------------------------------------------------------------
+# 仅注册到 workspace 根，供各 owner agent 接通真实实现时按需在 crate 级
+# `[dependencies]` 引用（`xxx.workspace = true`）。当前没有任何 crate 实际
+# 引用它们，注册本身不改变编译产物。版本与选型理由见
+# `docs/adr/ADR-DEPS-001-p0-p1-third-party-deps.md`。
+#
+# HTTP 客户端（最高频共享，6 crate：mobile/wallet/update/guest/discover/protocols）
+#   - 用 rustls-tls 避免引入 openssl（系统依赖 + license 复杂度），保持纯 Rust TLS 栈
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+# CLI 解析（os-cli 管理工具：树形子命令 + 全局选项）。clap 4 为当前稳定主线，
+# derive feature 提供声明式 struct 入口（替代 os-cli 自实现 parse_args）。
+# 选 rustls 兼容：clap 纯解析库无 TLS 栈耦合，与 reqwest 共栈无冲突。
+# 注：serde_yaml 裁决为「不注册」——os-cli 现有 YamlFormatter 自实现已覆盖需求
+# 且测试通过，引入 serde_yaml 将徒增依赖与破坏既有 yaml 测试（见 ADR-DEPS-001）。
+clap = { version = "4", features = ["derive", "env"] }
+# HTTP/WS 服务端（api Gateway / guest Captive Portal）
+axum = { version = "0.8", features = ["ws"] }
+# HTTP 中间件/服务组合（随 axum，api-agent 中间件链）
+tower = "0.5"
+# HTTP 底层（随 axum；显式注册便于 crate 直接使用）
+hyper = "1"
+# HTTP 请求/响应类型（随 hyper；显式注册便于 dav-server handler 测试构造请求）
+http = "1"
+# 鉴权
+jsonwebtoken = "9"  # JWT 签发/校验（security-agent JwtIssuer + guest/api 消费）
+# 密码哈希：Argon2id（security-agent DbAuthProvider + services files 分享密码）
+argon2 = "0.5"
+# 签名/摘要（安全关键：discover beacon 防伪 + update 包验签）
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+sha2 = "0.10"  # sha256（update 包校验 + 多加密库带入）
+# 编码（update 包签名/摘要的 Base64 + discover beacon 的 hex；与 ed25519/sha2 配套）
+base64 = "0.22"
+hex = "0.4"
+# CSPRNG 抽象：ed25519-dalek 的 rand_core feature 暴露密钥生成/签名入口（需注入
+# CryptoRngCore）。rand_core 是 ADR-DEPS-001 ed25519-dalek 选型的配套（ADR 原文：
+# "rand_core feature 暴露密钥生成入口（需注入 CSPRNG）"）。这里补注册到 workspace
+# 根，供 discover(beacon nonce/密钥对生成) 等按需 `rand_core.workspace = true` 引用。
+# 无新传递依赖——rand_core 0.6 已是 ed25519-dalek/uuid/argon2 的 lockfile 既有项。
+rand_core = { version = "0.6", features = ["std"] }
+# Linux 网络执行层（network/guest/compute(container)）
+nftnl = "0.7"  # nftables netlink 绑定（防火墙真实事务）
+mnl = "0.2"  # libmnl FFI（nftnl 批次经 netlink socket 发送：与 nftnl 共门控，缺 libmnl-dev 不进编译）
+rtnetlink = "0.16"  # netlink 接口/VLAN/桥配置
+# 全文搜索（services files/media 搜索引擎）
+tantivy = "0.22"
+# 静态资源内嵌（os-api Web UI：HTML/CSS/JS 编译进 binary，运行期无外部文件依赖）
+# rust-embed 在编译期把指定目录打进 binary；8.x 为当前稳定主线。
+rust-embed = "8"
+# 同步 Lazy 静态初始化（os-api 共享 reqwest::Client 等）。Rust 1.80 前无
+# std::sync::LazyLock，为保证 workspace MSRV 1.75 用 once_cell（纯 Rust）。
+once_cell = "1"
+# --- 二维码（os-api qr_transfer：QR 生成/解码纯 Rust 化，替代 python qrcode/pyzbar）---
+# qrcode：QR 生成（纯 Rust；image feature 支持渲染 ImageBuffer）。
+qrcode = "0.14"
+# rqrr：QR 解码（纯 Rust，无 zbar 系统库依赖）。
+rqrr = "0.7"
+# image：图像编解码（qrcode 渲染 PNG + rqrr 解码读帧共用）。
+image = "0.25"
+# --- 钱包密钥学（os-api blockchain：EVM 地址派生/密钥对生成纯 Rust 化，替代 python keccak）---
+# tiny-keccak：keccak256（EVM 地址 = keccak256(公钥)[12..]）。
+tiny-keccak = { version = "2.0", features = ["keccak"] }
+# k256：secp256k1（EVM 私钥→公钥 + 随机密钥对生成）。
+k256 = "0.13"
+
+# ----------------------------------------------------------------------------
+# P2 领域专用依赖（ADR-DEPS-002）
+# ----------------------------------------------------------------------------
+# 按 crate 归属注册的领域专用第三方库，覆盖各 owner agent 切入真实实现所需的
+# 共识/存储/虚拟化/区块链/网络协议/资源管控/可观测/安全等能力。与 P0/P1 同样，
+# 仅注册到 workspace 根，不引用即不改变任何编译产物；各 owner agent 接通时按需
+# `xxx.workspace = true` 引用。版本与选型理由见
+# `docs/adr/ADR-DEPS-002-p2-domain-specific-deps.md`。
+#
+# 注意：以下含 FFI 的 crate（virt）注册阶段不链接系统库；仅当某 crate 级
+# `[dependencies]` 引用后其 build script 才会查找 libvirt（需 libvirt-dev）。
+# rusqlite 用 `bundled` feature 内嵌编译 SQLite，规避系统 sqlite 依赖。
+#
+# --- 共识与元数据存储（os-meta）---
+# 真实 Raft 共识（替代 mock ConsensusEngine）。0.9 为最新稳定主线（0.10 alpha 不采用）。
+openraft = "0.9"
+# MetaStore SQLite，bundled feature 内嵌编译 sqlite3（避免系统 libsqlite3 依赖）。
+rusqlite = { version = "0.32", features = ["bundled"] }
+#
+# --- 虚拟化（os-compute VM/KVM）---
+# libvirt FFI 绑定（真实 KVM/QEMU 管理）。注：libvirt-dev 缺失时注册仍可，crate
+# 级引用才会链接。0.4 是当前主线。
+virt = "0.4"
+#
+# --- 区块链钱包（os-wallet）---
+# BTC：rust-bitcoin（crate 名 `bitcoin`）。0.32.x 稳定主线（0.33 仍 beta，不采用）。
+bitcoin = "0.32"
+# EVM：选 alloy（纯 Rust、更现代）而非 ethers。最新稳定 2.x。
+alloy = "2"
+# 验签：secp256k1（BTC/EVM 共享，与 bitcoin crate 同生态）。0.31 稳定主线（0.32 beta 不采用）。
+secp256k1 = "0.31"
+#
+# --- 文件/网络协议（os-protocols）---
+# WebDAV 服务端（dav-server，基于 axum/hyper）。0.11 最新稳定。
+dav-server = "0.11"
+# FTP 服务端（libunftp）。0.23 最新稳定。default-features=false 以便 consumer（os-protocols）
+# 按 ADR-DEPS-002 选 ring 后端（与 workspace rustls/ring 栈共栈），不引入 aws-lc-rs。
+libunftp = { version = "0.23", default-features = false }
+# SFTP 服务端（russh，纯 Rust SSH）。0.62 最新稳定。default-features=false 同理（ring 后端）。
+russh = { version = "0.62", default-features = false }
+#
+# --- 设备发现（os-discover）---
+# mDNS 服务发现（mdns-sd，纯 Rust，无 avahi 系统依赖）。0.20 最新稳定。
+mdns-sd = "0.20"
+# rustls TLS（mTLS 终结；与 reqwest rustls-tls 共栈）。`ring` feature 启用 ring 加密后端。
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+#
+# --- 资源管控（osd 守护进程）---
+# cgroup v2 资源限制（cgroups-rs）。0.5 最新稳定。
+cgroups-rs = "0.5"
+#
+# --- i18n（os-i18n）---
+# TOML 解析（自实现 translator 已就绪，仅需 toml 解析；选 toml 而非 rust-i18n）。
+# 1.x 最新稳定（向后兼容 0.8 API）。
+toml = "1"
+#
+# --- 可观测性（os-services monitor）---
+# OpenTelemetry 指标 + Prometheus exporter。0.32 最新稳定（两者版本同步）。
+opentelemetry = "0.32"
+# opentelemetry_sdk 是 opentelemetry 的实现层（SdkMeterProvider 等），
+# opentelemetry-prometheus 0.32 内部传递依赖 0.32.x；显式注册便于 crate
+# 直接 use SdkMeterProvider / Resource。
+opentelemetry_sdk = "0.32"
+opentelemetry-prometheus = "0.32"
+# rust-prometheus（prometheus 0.14）：opentelemetry-prometheus 0.32 内部
+# 传递依赖的 Registry/Encoder；显式注册便于 monitor-agent 在 /metrics 端点
+# 直接用 TextEncoder 编码（registry.gather + encode → 文本格式输出）。
+prometheus = { version = "0.14", default-features = false }
+#
+# --- 安全（os-security）---
+# rcgen：CA 自签证书生成（X.509）。0.14 最新稳定。
+rcgen = "0.14"
+# boringtun：WireGuard VPN（userspace，Cloudflare 维护）。0.7 最新稳定。
+boringtun = "0.7"
+# instant-acme：ACMEv2 (RFC 8555) 客户端，对接 Let's Encrypt 等自动证书签续。
+# 0.8 最新稳定（任务方建议 0.7 或最新；0.8 是 docs.rs 当前主线，与 0.7 API 兼容，
+# 0.8 修正 Account/Order 句柄生命周期并补 ARI / device-attest）。
+# feature：开 `hyper-rustls`（默认 HTTP 客户端，rustls 后端，与 workspace rustls 栈共栈）
+# 与 `rcgen`（Order::finalize 内部用 rcgen 生成 CSR——os-security 已依赖 rcgen）。
+# 默认 aws-lc-rs；改选 ring 后端（与 workspace rustls/discover 一致，避免 aws-lc-rs 的
+# C 编译器 + nasm 依赖）。详见 docs/adr/ADR-DEPS-004-acme.md。
+instant-acme = { version = "0.8", default-features = false, features = ["hyper-rustls", "rcgen", "ring"] }
+#
+# --- AEAD 加密（os-services devtools 密钥 KVS）---
+# ADR-DEPS-003：注册纯 Rust AEAD 库，供 os-services(devtools) 的密钥 KVS
+# 真实 AES-256-GCM 加密（替代 ENC: 占位）。0.10 最新稳定，默认带 `aes` feature。
+# 选型理由：NIST 标准（GCM = SP 800-38D）、纯 Rust（无 OpenSSL FFI）、
+# 与 reqwest/rustls 的 ring 后端不冲突（独立类型栈）。
+aes-gcm = "0.10"
+#
+# --- 开发者工具（os-services devtools）---
+# gix：纯 Rust Git 实现（gitoxide 旗舰 crate）。0.86 最新稳定。
+gix = "0.86"
+
+# --- MCP（Model Context Protocol，os-mcp）---
+# rmcp：Rust MCP SDK（Anthropic 的 AI 工具协议官方 Rust 实现）。3.1.1 当前主线。
+# 默认 features 已含 `server`（ServerHandler trait + tools 系统）。
+# os-mcp 默认走手写最小 JSON-RPC over stdio（更易测、表驱动 tools 注册）；
+# `rmcp-transport` feature 可切到 rmcp 官方 transport（`ServiceExt::serve(stdio())`）。
+# 选型理由见 docs/adr/ADR-DEPS-002 + crates/os-mcp/README。
+rmcp = "3.1.1"
+
+# --- 终端（os-api 管理应用 Web 终端）---
+# portable-pty：纯 Rust 跨平台 PTY（wezterm 抽出）。「管理」桌面应用
+# （handlers/terminal.rs）在 PTY 里 spawn bash（本地终端）或 ssh -tt
+# （远程终端，密码提示经 PTY 透传），输出经 WS 帧协议推给浏览器 xterm.js。
+# 选型理由：无系统依赖（对比 libvterm/shell crate 维护停滞）、wezterm
+# 生产验证、MasterPty/Child 抽象正好覆盖 resize/kill/等待退出码需求。
+# 0.9 当前稳定主线。
+portable-pty = "0.9"
+
+# --- 性能基准（dev-only；各 crate 在 [dev-dependencies] 引用）---
+# criterion：统计驱动的 micro-benchmark 框架（html_reports 输出回归对比图）。
+# 仅 dev-dep，不进入任何 release 产物；与 ADR-DEPS-001/002 的运行时依赖隔离。
+# 0.5 当前稳定主线（async/realtime feature 暂不需要，仅默认 + html_reports）。
+criterion = { version = "0.5", features = ["html_reports"] }
+
+# ----------------------------------------------------------------------------
+# CLIP 推理后端（ADR-DEPS-005）
+# ----------------------------------------------------------------------------
+# candle（HuggingFace 纯 Rust ML 框架）：CLIP 图像/文本向量嵌入推理后端，
+# 替代 PlaceholderClipModel 占位。选型理由见 docs/adr/ADR-DEPS-005-clip-backend.md。
+#
+# workspace 注册不带 GPU feature（保证无 GPU 环境/CI 可编译）。
+# GPU 加速（cuda feature）通过 crate 级 feature flag 按需开启。
+# 三件套版本须同步（0.11.x）；0.11 是当前稳定主线。
+#
+# --- CLIP 推理（os-services media）---
+# candle-core：张量/运算后端（CPU 默认；cuda/metal/accelerate feature 按需开启）。
+candle-core = "0.11"
+# candle-nn：神经网络层（线性/归一化/激活函数/损失）。
+candle-nn = "0.11"
+# candle-transformers：transformer 模型定义/加载（CLIP ViT-B/32 等内置支持）。
+candle-transformers = "0.11"
+
+# 内部 crate（版本同步）
+os-core = { path = "crates/os-core" }
+os-common = { path = "crates/os-common" }
+os-i18n = { path = "crates/os-i18n" }
+osd = { path = "crates/osd" }
+os-storage = { path = "crates/os-storage" }
+os-network = { path = "crates/os-network" }
+os-security = { path = "crates/os-security" }
+os-protocols = { path = "crates/os-protocols" }
+os-compute = { path = "crates/os-compute" }
+os-wallet = { path = "crates/os-wallet" }
+os-meta = { path = "crates/os-meta" }
+os-discover = { path = "crates/os-discover" }
+os-p2p = { path = "crates/os-p2p" }
+os-identity = { path = "crates/os-identity" }
+os-guest = { path = "crates/os-guest" }
+os-provision = { path = "crates/os-provision" }
+os-iso = { path = "crates/os-iso" }
+os-update = { path = "crates/os-update" }
+os-im = { path = "crates/os-im" }
+os-api = { path = "crates/os-api" }
+os-nexhub = { path = "crates/os-nexhub" }
+os-services = { path = "crates/os-services" }
+os-cli = { path = "crates/os-cli" }
+os-mobile = { path = "crates/os-mobile" }
+os-desktop = { path = "crates/os-desktop" }
+os-mcp = { path = "crates/os-mcp" }

@@ -1,0 +1,28 @@
+[package]
+name = "os-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 桌面客户端（Windows 优先）Rust 核心 SDK：复用 os-mobile 客户端 + 一键挂载网络驱动器（见规划文档 §3.15）（接口契约）"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+os-core.workspace = true
+os-common.workspace = true
+os-mobile.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[features]
+default = []
+# 提供 Mock 实现供前端/UI 测试
+mock = []

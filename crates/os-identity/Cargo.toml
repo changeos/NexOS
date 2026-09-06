@@ -1,0 +1,18 @@
+[package]
+name = "os-identity"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "NexOS 身份账本：指纹（NodeID↔地址）证据登记 + 对比判定 + 冲突/失配观测 + JSON 持久化——从 os-p2p 抽离的纯库组件（架构 docs/IDENTITY_COMPONENT.md）"
+
+[dependencies]
+# 账本记录/证据/查询 DTO 的序列化（JSON 持久化 + os-api REST 透出）。
+serde.workspace = true
+serde_json.workspace = true
+# 加载/落盘失败的结构化告警（损坏重建等可观测事件）。
+tracing.workspace = true
+
+[dev-dependencies]
+# 无——本 crate 纯逻辑无第三方测试依赖（持久化测试用 std::fs + temp_dir）。

@@ -1,0 +1,55 @@
+[package]
+name = "osd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 系统编排守护进程（PID1 后）：组件生命周期 + cgroup v2 资源配额 + NTP（契约层）"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+# binary 入口（main.rs）需要 macros（#[tokio::main]）+ rt-multi-thread + signal
+# （SIGTERM/SIGINT 优雅停止）。workspace tokio 已开 full（含上述三项），
+# 此处显式标注 binary 所需 feature 以明意图（去耦 workspace 改动）。
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
+os-core.workspace = true
+os-common.workspace = true
+# cgroup v2 资源配额（ADR-DEPS-002 已注册；本次接通真实 cgroups-rs 后端，
+# 见 src/cgroup.rs）。真实 cgroup 写入需 root + CAP_SYS_ADMIN + cgroup v2 挂载。
+cgroups-rs.workspace = true
+# binary 入口（main.rs）命令行参数解析（clap derive）。workspace 已注册（os-cli 同款）。
+clap.workspace = true
+# binary 入口（main.rs）--check 模式的 CPU 虚拟化前置检测（os-compute::preflight_virt_check）。
+os-compute.workspace = true
+# binary 入口（main.rs）--serve-api 模式内嵌 os-api 网关（同进程 tokio::spawn axum::serve）。
+# 注册 Storage/Compute/System RouteHandler + 中间件链（RateLimit→Auth→Audit）。
+os-api.workspace = true
+# --serve-api 装配真实 RouteHandler 所需后端：ZfsCliBackend（storage）/ LibvirtVmManager（compute）。
+os-storage.workspace = true
+
+# binary 入口：osd 守护进程可执行（tokio::main + clap 参数 + --check preflight + 信号处理）。
+[[bin]]
+name = "osd"
+path = "src/main.rs"
+
+[features]
+# 健康探针/编排器的内存 mock（仅测试用，规格书 §5.1 / §5.2）
+default = []
+mock = []
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }
+# 性能基准（criterion）：micro-benchmark 组件依赖拓扑排序（Kahn 算法）。
+# workspace 已注册（dev-only）；不进入 release 产物。
+criterion.workspace = true
+
+# 性能基准：组件依赖拓扑排序 + 环检测（Kahn 算法，大依赖图）。
+# harness=false 让 criterion 提供自己的 main。
+[[bench]]
+name = "topo"
+path = "benches/topo.rs"
+harness = false

@@ -1,0 +1,61 @@
+[package]
+name = "os-protocols"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 文件共享协议层：SMB/NFS/WebDAV/FTP/SFTP 编排 + S3 兼容对象存储（RustFS，契约层）"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+os-core.workspace = true
+os-common.workspace = true
+os-storage.workspace = true
+
+# —— P2 真实协议栈（ADR-DEPS-002）——
+# dav-server：WebDAV 服务端（基于 axum/hyper）；启用 memfs 以获得离线可测的内存后端。
+dav-server = { workspace = true, features = ["memfs"] }
+# libunftp：FTP 服务端；启用 ring 后端以与 workspace 的 rustls/ring 栈共栈。
+libunftp = { workspace = true, default-features = false, features = ["ring"] }
+# unftp-core：StorageBackend / Metadata / UserDetail trait（libunftp 通过它定义存储契约）。
+unftp-core = "0.1"
+# russh：纯 Rust SSH 服务端（SFTP 子系统承载）；default-features=false + ring，
+# 与 workspace 的 rustls/ring 栈共栈（避免引入 aws-lc-rs 的 C/nasm 依赖）。
+russh = { workspace = true, default-features = false, features = ["flate2", "ring", "rsa"] }
+# async-trait：libunftp 的 StorageBackend/Authenticator 仍以 #[async_trait] 暴露。
+async-trait = "0.1"
+# http / http-body：dav-server 的 DavHandler.handle 签名直接消费这两个类型（对外
+# 暴露 handle_request 入口必需），随 dav-server/hyper 一并属于 P2 接通栈。
+http = { workspace = true }
+http-body = "1"
+# rand：russh-keys 的 PrivateKey::random 主机密钥生成（与 russh 0.62 的 rand 0.10 同栈）。
+rand = "0.10"
+
+[dev-dependencies]
+# 测试用 hyper 1.x 跑 dav-server 的真实 handler（不发网络，构造 http::Request 喂入）。
+hyper = { workspace = true }
+http-body-util = "0.1"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tempfile = "3"
+# —— object_http_real.rs 真实测专用 ——
+# reqwest：对 AWS S3 公开桶发真实 GET / ListObjects 请求（验证 sigv4 签名后 HTTP 栈通）。
+#   rustls-tls 与 workspace 根 reqwest 共栈（避免引入 openssl）。
+reqwest = { workspace = true }
+# sha2 / hmac / hex：sigv4 端到端签名（signing_key + signature）的 HMAC-SHA256 + hex 编码。
+#   生产 RustFsObjectStore 未接通，故本 crate 主代码不引；测里把签名链跑齐以对拍 AWS 测试向量。
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+
+[features]
+# mock feature 暴露：MockObjectStore(object-agent) + MockSmbManager/MockNfsManager/
+# MockWebDavManager/MockFtpManager/MockSftpManager(protocol-agent)。
+# 用法：[dev-dependencies] os-protocols = { workspace = true, features = ["mock"] }
+default = []
+mock = []

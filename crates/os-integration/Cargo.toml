@@ -1,0 +1,53 @@
+[package]
+name = "os-integration"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 系统跨 crate 端到端集成测骨架（VM 创建 / 访客链上验证 / HA 故障转移，见 integration-agent 规格书 §3）"
+
+[lib]
+# 本 crate 不产出运行时库，仅承载跨 crate 集成测用例（tests/）。
+# 用 `path` 风格的 integration tests，每场景一个 `tests/<scenario>.rs` 文件，
+# 独立编译成 test binary，互不污染状态。
+path = "src/lib.rs"
+
+[features]
+default = []
+
+[dependencies]
+# 本 crate 无运行时依赖（仅集成测）；测试用例全部走 [dev-dependencies]。
+
+[dev-dependencies]
+# —— 测试运行时 ——
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
+futures.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+
+# —— 全部 22 crate（启用 mock feature 注入各组件）——
+os-core = { workspace = true, features = ["mock"] }
+os-common.workspace = true
+os-i18n.workspace = true
+os-storage = { workspace = true, features = ["mock"] }
+os-network = { workspace = true, features = ["mock"] }
+os-security = { workspace = true, features = ["mock"] }
+os-protocols.workspace = true
+os-compute = { workspace = true, features = ["mock"] }
+os-wallet = { workspace = true, features = ["mock"] }
+os-meta = { workspace = true, features = ["mock"] }
+os-discover = { workspace = true, features = ["mock"] }
+os-guest = { workspace = true, features = ["mock"] }
+os-provision = { workspace = true, features = ["mock"] }
+os-iso.workspace = true
+os-update = { workspace = true, features = ["mock"] }
+os-im = { workspace = true, features = ["mock"] }
+os-api = { workspace = true, features = ["mock"] }
+os-services = { workspace = true, features = ["mock"] }
+os-cli.workspace = true
+os-mobile.workspace = true
+os-desktop.workspace = true
+osd = { workspace = true, features = ["mock"] }
