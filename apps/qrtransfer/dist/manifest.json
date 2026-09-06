@@ -1,0 +1,10 @@
+{
+  "id": "qrtransfer",
+  "name": "二维码传输",
+  "version": "0.1.1",
+  "category": "devtools",
+  "icon": "<rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"5\" y=\"5\" width=\"3\" height=\"3\" fill=\"currentColor\" stroke=\"none\"/><rect x=\"16\" y=\"5\" width=\"3\" height=\"3\" fill=\"currentColor\" stroke=\"none\"/><rect x=\"5\" y=\"16\" width=\"3\" height=\"3\" fill=\"currentColor\" stroke=\"none\"/><rect x=\"14\" y=\"14\" width=\"2.5\" height=\"2.5\" fill=\"currentColor\" stroke=\"none\"/><rect x=\"18.5\" y=\"14\" width=\"2.5\" height=\"2.5\" fill=\"currentColor\" stroke=\"none\"/><rect x=\"14\" y=\"18.5\" width=\"2.5\" height=\"2.5\" fill=\"currentColor\" stroke=\"none\"/><rect x=\"18.5\" y=\"18.5\" width=\"2.5\" height=\"2.5\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M16.5 16.5h2\" opacity=\"0.7\"/><path d=\"M19.75 16.5v0\" opacity=\"0.7\"/>",
+  "description": "二维码文件/文本传输：文件 → 跳动 QR 视频 → 解码回文件，适合离线与物理隔离场景",
+  "entry": "web/entry.js",
+  "engine": "qrtransfer"
+}

@@ -1,0 +1,276 @@
+# OS System - Continuous Integration
+# 守护 workspace 的 fmt / check / clippy / test 四道门（devops-agent C1-C4 + §5.1）。
+# 另提供手动/main-only 的 bench job（criterion 微基准，不阻塞 PR）。
+# 详见 docs/agents/devops-agent.md §3 CI/构建服务清单。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # 手动触发（Actions 标签页 "Run workflow"）——跑全量（含 bench job）+ 可选 iso-build job。
+  # 默认 push/PR 不触发 iso-build（需真实 xorriso + squashfs-tools，见 Dockerfile.iso）。
+  workflow_dispatch:
+    inputs:
+      run_iso_build:
+        description: "运行可选 iso-build job（真实 xorriso ISO 构建 #[ignore] 测）"
+        required: false
+        type: boolean
+        default: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: short
+  # sccache 加速重复编译（devops-agent §5.1 缓存策略）。
+  RUSTC_WRAPPER: sccache
+  SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
+  # 避免.incremental 在 CI 污染缓存。
+  CARGO_INCREMENTAL: 0
+
+# 同分支并发只跑最新一次。
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-clippy-test:
+    name: fmt + check + clippy + test
+    runs-on: ubuntu-latest
+    # debug 符号是 target 体积大头：CI 去掉 dev/test profile 的 debug info，
+    # 防止 runner 磁盘耗尽（2026-08-17 实测链接期 "Free space left: 14 MB"）。
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+
+    steps:
+      - name: Free disk space
+        # 移除 runner 预装的无关大件（Android SDK/.NET/GHC 等约 30G+），防止磁盘耗尽。
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Cache cargo target + sccache
+        uses: Swatinem/rust-cache@v2
+        with:
+          # 按分支隔离 target，避免跨分支污染。
+          shared-key: workspace-mock
+          cache-targets: true
+
+      # fmt 门最便宜（只解析 + 比对，不编译），应最先跑，尽快给出可读 diff。
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      # rust-embed 在编译期要求 crates/os-api/static-dist/ 存在（os-api 内嵌 Vue3 产物），
+      # 而该目录被 .gitignore 排除（GitHub checkout 后不存在）——
+      # 任何会编译 os-api 的 cargo 步骤之前都必须先构建前端（与 make web 等价）。
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build web assets (rust-embed 依赖 static-dist)
+        working-directory: crates/os-api/web
+        run: |
+          npm ci
+          npm run build
+          # node_modules（约数百 MB）在 static-dist 产出后即无用，删掉给 cargo 腾磁盘。
+          rm -rf node_modules
+
+      - name: cargo check --workspace
+        run: cargo check --workspace --features mock --all-targets
+
+      - name: cargo clippy --workspace (-D warnings)
+        run: cargo clippy --workspace --all-targets --features mock -- -D warnings
+
+      - name: cargo test --workspace
+        run: cargo test --workspace --features mock
+
+  # bench job：手动触发（workflow_dispatch）或 main push 时跑。
+  # criterion 微基准耗时长，绝不在 PR 上跑（避免拖慢反馈循环）。
+  #
+  # 回归门控（feature/bench-regression-ci）：本 job 用 criterion 的
+  # --save-baseline / --baseline 机制做"跨 run 性能回归比对"——
+  #   1) 从上一次成功 bench run 拉取 baseline artifact（target/criterion 快照）。
+  #   2) 若存在：cargo bench -- --baseline <name>（比对模式，报每个 bench 的变化 %）。
+  #      若不存在（首次跑）：cargo bench -- --save-baseline <name>（建基线，必过）。
+  #   3) scripts/ci/bench-regression-gate.sh 解析输出，超阈值回归（见下方 env）则 fail。
+  #   4) 上传本次 target/criterion 作为下次比对的 baseline artifact。
+  # 阈值策略分桶（见 docs/PERFORMANCE_BASELINE.md §5 / §CI 回归检测）：
+  #   - 纯算法 bench（routing/meta/storage/topo）：mean 回归 > 15% 报失败。
+  #   - 高方差 bench（tantivy search_index_build）：mean 回归 > 30% 报失败。
+  # 详见 docs/PERFORMANCE_BASELINE.md "CI 回归检测" 一节。
+  bench:
+    name: criterion bench (回归门控)
+    # 让 lint/test 门失败时不必再跑耗时的 bench。
+    needs: check-clippy-test
+    # 初期更改频繁（2026-08-17 用户决策）：bench 仅手动触发，省 runner 分钟数；
+    # 性能进入关注期后恢复 push 门控（加回 || (push && main) 分支）。
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      # gh api 读历史 workflow runs / artifacts 需要 actions: read。
+      actions: read
+      contents: read
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      # criterion baseline 名（稳定字符串，跨 run 一致）。
+      BASELINE_NAME: os-baseline
+      # artifact 名（稳定，用于跨 run 拉取/上传 baseline 快照）。
+      BASELINE_ARTIFACT: criterion-baseline
+      # 回归阈值（% mean 变化点估计，正=变慢）。见上方注释的分桶策略。
+      STRICT_THRESHOLD: "15"   # routing / meta / storage / topo
+      LOOSE_THRESHOLD: "30"    # tantivy search_index_build（方差 17–35%）
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Cache cargo target + sccache
+        uses: Swatinem/rust-cache@v2
+        with:
+          # bench profile 与测试 target 分桶，避免缓存互踩。
+          shared-key: workspace-bench
+          cache-targets: true
+
+      # bench 编译 os-api → 同样依赖 rust-embed 的 static-dist（gitignore 目录，见上）。
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build web assets (rust-embed 依赖 static-dist)
+        working-directory: crates/os-api/web
+        run: |
+          npm ci
+          npm run build
+          rm -rf node_modules
+
+      # 拉取上一次成功 bench run 的 baseline artifact（target/criterion 快照）。
+      # 用 gh api 查最近一次本 workflow（CI）在 default 分支成功的 bench job run，
+      # 拿其 criterion-baseline artifact 并下载解压到 target/criterion。
+      # 首次跑（无历史 baseline）时下载失败属正常，HAS_BASELINE 留空，后续走 save-baseline。
+      - name: Restore baseline artifact (previous run)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          ./.github/scripts/restore-baseline.sh \
+            "${BASELINE_ARTIFACT}" target/criterion > restore.log 2>&1
+          rc=$?
+          if [ $rc -eq 0 ]; then
+            echo "HAS_BASELINE=1" >> "$GITHUB_ENV"
+            echo "✓ 成功恢复历史 baseline（target/criterion 已就绪，本次将比对）。"
+          else
+            echo "HAS_BASELINE=" >> "$GITHUB_ENV"
+            echo "ℹ 无可用历史 baseline（首次跑 / 历史 artifact 已过期）—— 本次将 save-baseline 建基线。"
+            tail -n 20 restore.log || true
+          fi
+
+      # 跑 criterion：有 baseline 走比对（--baseline），无则建基线（--save-baseline）。
+      # 注意 --baseline 模式下 criterion 仍会写 target/criterion（更新 new 快照），
+      # 供下一次 run 比对用——故无论哪条路径，结束后都上传 target/criterion。
+      - name: cargo bench (os-storage + os-meta + osd + os-services + os-api)
+        run: |
+          if [ -n "$HAS_BASELINE" ]; then
+            echo "→ 比对模式：cargo bench -- --baseline $BASELINE_NAME"
+            cargo bench \
+              -p os-storage -p os-meta -p osd -p os-services -p os-api \
+              --features mock \
+              -- --baseline "$BASELINE_NAME" \
+              2>&1 | tee criterion-bench.log
+          else
+            echo "→ 建基线模式：cargo bench -- --save-baseline $BASELINE_NAME（首次，必过）"
+            cargo bench \
+              -p os-storage -p os-meta -p osd -p os-services -p os-api \
+              --features mock \
+              -- --save-baseline "$BASELINE_NAME" \
+              2>&1 | tee criterion-bench.log
+          fi
+
+      # 回归门控：解析 criterion-bench.log，超阈值的 bench 让本 step（进而本 job）失败。
+      # 首次跑（save-baseline）无 change 行 → 脚本 exit 0，不阻塞建基线。
+      - name: Regression gate (parse criterion changes vs threshold)
+        env:
+          STRICT_THRESHOLD: ${{ env.STRICT_THRESHOLD }}
+          LOOSE_THRESHOLD: ${{ env.LOOSE_THRESHOLD }}
+        run: |
+          scripts/ci/bench-regression-gate.sh criterion-bench.log
+
+      # 上传本次 target/criterion 作为"下次比对用的 baseline 快照"（稳定 artifact 名）。
+      # 用 if: always() 保证即便回归门失败也能留下基线供下次比对（基线本身是有效的）。
+      - name: Upload baseline snapshot (for next run comparison)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BASELINE_ARTIFACT }}
+          path: |
+            criterion-bench.log
+            target/criterion
+          if-no-files-found: warn
+          retention-days: 90
+
+      # 另存一份带 run_id 的历史快照（人工审阅 / 出问题后回溯用，与稳定 baseline 名分离）。
+      - name: Upload run-id stamped bench log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-bench-${{ github.run_id }}
+          path: |
+            criterion-bench.log
+            restore.log
+          if-no-files-found: warn
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # iso-build：可选 job，真实 xorriso + mksquashfs ISO 构建端到端测。
+  # ---------------------------------------------------------------------------
+  # 仅手动触发（workflow_dispatch）时运行；push/PR 不跑——真实 ISO 构建需 xorriso +
+  # squashfs-tools（普通 ubuntu-latest runner 默认不装），用 scripts/sandbox/docker/
+  # Dockerfile.iso 镜像提供工具链（呼应 docs/SANDBOX.md ISO 工具链依赖 + docs/
+  # DEPLOYMENT.md §5.2 ISO 构建命令）。
+  #
+  # 独立 job，不依赖 check-clippy-test，也不改其行为（与 ci-harden 等子代理隔离）。
+  iso-build:
+    name: iso-build (真实 xorriso, #[ignore])
+    # 仅手动触发且显式勾选时跑；其余情况自动 skip。
+    if: github.event_name == 'workflow_dispatch' && inputs.run_iso_build == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build ISO sandbox image (Dockerfile.iso)
+        # 构建含 xorriso + squashfs-tools + Rust stable 的沙箱镜像。
+        # 见 scripts/sandbox/docker/Dockerfile.iso 顶部注释。
+        run: |
+          docker build -t os-iso-build:ci \
+            -f scripts/sandbox/docker/Dockerfile.iso scripts/sandbox/docker
+
+      - name: 跑真实 ISO 构建 #[ignore] 测（容器内）
+        # 仓库挂入 /workspace；容器内用装好的 xorriso/mksquashfs 跑 #[ignore] 测。
+        # SCCACHE_DIR 指向挂载内可写目录，避免容器内无权写 /workspace/.cache。
+        run: |
+          docker run --rm \
+            -v "$PWD":/workspace:rw -w /workspace \
+            -e RUSTC_WRAPPER= \
+            os-iso-build:ci \
+            cargo test -p os-iso --features mock \
+              --test real_xorriso_build -- --ignored --nocapture

@@ -1,0 +1,1 @@
+# 池配置元数据（ZFS pool 拓扑 / dataset 列表）。运行时由 os-storage 写入。

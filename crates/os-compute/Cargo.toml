@@ -1,0 +1,45 @@
+[package]
+name = "os-compute"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 计算层：KVM 虚拟机(libvirt) + youki 容器 + CNI 容器网络 + 第三方 .deb 包管理（契约层）"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+tokio.workspace = true
+os-core.workspace = true
+os-common.workspace = true
+os-storage.workspace = true
+os-network.workspace = true
+
+# virt-ffi feature：启用真实 libvirt FFI 绑定（virt crate）。
+# 注意：virt crate 的 build script 在编译期链接系统 libvirt，需先
+# `apt install libvirt-dev`（提供 libvirt.so 与头文件）。本机/CI 无 libvirt-dev
+# 时该 feature 编译会失败——故列为 optional，默认编译路径（XML 渲染 + 状态机 +
+# 内存态骨架）不依赖 virt，仍可 check/test/clippy。详见
+# docs/adr/ADR-DEPS-002-p2-domain-specific-deps.md 与 docs/agents/vm-agent.md。
+virt = { workspace = true, optional = true }
+
+[features]
+default = []
+# `mock` feature：暴露 MockVmManager（vm-agent）+ MockContainerRuntime/MockContainerNetwork/MockPackageManager（container-agent）。
+# 设计见 _conventions.md §5（feature gate 守护，纯内存实现，供下游测试注入）。
+# 用法：[dev-dependencies] os-compute = { workspace = true, features = ["mock"] }
+mock = []
+# `virt-ffi` feature：启用真实 libvirt FFI（virt crate）。开启后 LibvirtVmManager
+# 经 virConnectOpen/virDomain* 真实操作 KVM。前置：构建机需装 libvirt-dev。
+virt-ffi = ["dep:virt"]
+
+[dev-dependencies]
+# 自引用以在 unit test 中验证 mock 实现。workspace 路径依赖循环安全（cargo 允许）。
+os-compute = { workspace = true, features = ["mock"] }
+# 临时目录：OCI config.json / CNI conflist 落盘往返测试用（与 os-protocols/os-update
+# 一致：直接版本化依赖，不挂 workspace）。提供自动清理 + 互不干扰。
+tempfile = "3"

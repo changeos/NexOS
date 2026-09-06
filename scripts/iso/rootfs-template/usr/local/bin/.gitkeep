@@ -1,0 +1,4 @@
+# 占位文件：本目录用于安装 OS Rust binary。
+# build-iso.sh 在 squashfs 打包前 COPY：
+#   target/release/{osd,os-api,os-mcp,os}  →  usr/local/bin/
+# 详见同仓 README.md「binary」一节（4 个 [[bin]] 入口）。

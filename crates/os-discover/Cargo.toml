@@ -1,0 +1,49 @@
+[package]
+name = "os-discover"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 系统节点发现与联邦：LAN 发现(mDNS)+凭证配对互联(mTLS)+HA 资格检测+联邦决策（见规划文档 §3.14）"
+
+[features]
+# 默认不含 mock；下游测试启用以获得 MockDiscovery / MockPeerAuthenticator / MockFederationPolicy
+# （见 _conventions.md §5）。用法：[dev-dependencies] os-discover = { workspace = true, features = ["mock"] }
+default = []
+mock = []
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+# 真实 beacon 防伪验签（ADR-DEPS-001 P1 依赖接入）：ed25519-dalek 签名/验签 +
+# rand_core 注入 OsRng（CSPRNG，nonce/密钥对生成）+ sha2 公钥指纹（与 mTLS 证书
+# 指纹 SHA-256 一致）。详见 beacon.rs。
+ed25519-dalek.workspace = true
+rand_core.workspace = true
+sha2.workspace = true
+# 真实 mDNS 组播广播/扫描（ADR-DEPS-002 P2 依赖接入）：mdns-sd 纯 Rust，无 avahi
+# 系统依赖。MdnsDiscovery 用其 ServiceDaemon 完成本机 beacon 发布与对端 peer 发现，
+# 节点信息承载在 mDNS TXT 记录（beacon 签名 hex + 公钥指纹等）。详见 impls.rs。
+mdns-sd.workspace = true
+# 真实 mTLS 双向认证（ADR-DEPS-002 P2 依赖接入）：rustls 0.23 + ring 后端，与
+# reqwest rustls-tls 共栈。MtlsPeerAuthenticator 用其加载本机证书链 + 对端根证书库，
+# 完成 mTLS 握手并产出 PeerSession（mtls_cert_fingerprint = SHA-256）。详见 mtls.rs。
+# 注：pki_types 类型（CertificateDer / PrivateKeyDer / ServerName）通过
+# `rustls::pki_types` re-export 访问，无需单独引用 rustls-pki-types（未在 workspace
+# 注册，红线：不虚构依赖）。
+# 注：workspace 声明 default-features=false, ["ring"]；此处补启 "std" feature——
+# ClientConnection/ServerConnection/StreamOwned 由 "std" feature 门控（rustls 0.23
+# 默认开 std，但 workspace 禁用了默认 features 故需在此补启，无新增传递依赖）。
+rustls = { workspace = true, features = ["std"] }
+os-core.workspace = true
+os-common.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }
+# rcgen：自签 X.509 证书生成（仅测试用——构造 mTLS 握手 fixture；ADR-DEPS-002 注册）。
+rcgen.workspace = true

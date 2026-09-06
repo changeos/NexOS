@@ -1,0 +1,23 @@
+[Unit]
+Description=OS System Orchestrator (PID1 后守护进程)
+Documentation=file:///usr/local/share/os/docs/osd.md
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+# osd 作为 PID1 之后的系统编排守护进程，内嵌 HTTP API 网关。
+# --serve-api 0.0.0.0:8080：对外暴露 REST/JSON API（管理池/数据集/快照/VM/共享/用户）。
+ExecStart=/usr/local/bin/osd --serve-api 0.0.0.0:8080
+ExecStop=/bin/kill -SIGTERM $MAINPID
+# 优雅退出：SIGTERM 触发 osd 关停组件图（api → network → storage）。
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=3
+# 安全加固（最小权限；rootfs 内 osd 需访问 /dev/zfs 与 /var/lib/os）。
+# 注：zfs 子进程需保留 CAP_SYS_ADMIN；这里宽松以便首版自启，后续收紧。
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

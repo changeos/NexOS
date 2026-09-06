@@ -1,0 +1,46 @@
+# OS System —— Docker 构建上下文排除清单
+# 目的：缩小 build context（避免把 target/ / .git / docs / worktree 推给 daemon），
+#       并防止本地构建产物污染镜像内的源码拷贝。
+
+# ---- Rust 构建产物（最大头，可达数 GB）----
+target/
+**/target/
+
+# ---- Cargo 本地缓存 / 临时 ----
+.cargo/registry/
+.cargo/git/
+**/*.rs.bk
+
+# ---- Git / 版本控制 ----
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# ---- 文档（镜像不需要文档源；ADR / 规划文档不入产物）----
+docs/
+*.md
+!README.md
+
+# ---- 沙箱脚本与沙箱 Dockerfile（避免与根 Dockerfile 混淆 + 减小上下文）----
+scripts/sandbox/
+
+# ---- 编辑器 / IDE / OS 杂项 ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ---- worktree（git worktree 元数据与并行工作树）----
+**/.git
+
+# ---- 本 Docker 打包任务的产出（避免递归进上下文）----
+# 注：Dockerfile / .dockerignore 本身会被 Docker 自动包含，无需排除。
+docker-compose.yml
+
+# ---- 日志 / 临时文件 ----
+*.log
+.tmp/
+tmp/

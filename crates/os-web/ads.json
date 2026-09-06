@@ -1,0 +1,50 @@
+[
+  {
+    "id": "ad-1",
+    "text": "🎉 NexOS — 连接 OS，打破信息孤岛",
+    "link": null,
+    "icon": "🚀",
+    "enabled": true,
+    "sort": 0
+  },
+  {
+    "id": "ad-2",
+    "text": "💡 支持 ZFS 存储池 · 虚拟机 · Docker · 流媒体转码",
+    "link": null,
+    "icon": "💾",
+    "enabled": true,
+    "sort": 1
+  },
+  {
+    "id": "ad-3",
+    "text": "🤖 AI 相册 · 模型管理 · API 网关 — 内置 Qwen3-VL 推理",
+    "link": null,
+    "icon": "🧠",
+    "enabled": true,
+    "sort": 2
+  },
+  {
+    "id": "ad-4",
+    "text": "🔒 端到端加密 · 多用户权限 · 数据安全有保障",
+    "link": null,
+    "icon": "🔐",
+    "enabled": true,
+    "sort": 3
+  },
+  {
+    "id": "ad-5",
+    "text": "📡 区块链管理 · 一键部署 RPC 节点 + 浏览器",
+    "link": null,
+    "icon": "⛓️",
+    "enabled": true,
+    "sort": 4
+  },
+  {
+    "id": "ad-6",
+    "text": "🎬 影院 · 音乐 · 相册 — TMDB 刮削 + AI 智能分类",
+    "link": null,
+    "icon": "🍿",
+    "enabled": true,
+    "sort": 5
+  }
+]
