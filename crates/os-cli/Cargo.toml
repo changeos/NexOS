@@ -1,0 +1,51 @@
+[package]
+name = "os-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 管理命令行工具：连接 os-api 或本地直调（见规划文档 §3.0/#19）（接口契约）"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+# —— 真实命令解析 + 网关调用（接通 clap + reqwest）——
+# clap：树形子命令 + 全局选项（--server/--output/--token），替代自实现 parse_args。
+clap.workspace = true
+# reqwest：经网关 REST 调用 os-api（rustls-tls，与 os-mobile 共栈；ADR-DEPS-001）。
+reqwest.workspace = true
+# tokio：命令执行为异步（调 OsClient），需 runtime。
+tokio.workspace = true
+# os-mobile：复用 OsClient / HttpOsClient / HttpTransport（避免在 CLI 侧重复定义 HTTP 客户端）。
+os-mobile.workspace = true
+# os-discover：PeerNode 类型（discover 子命令返回值）。
+os-discover.workspace = true
+os-core.workspace = true
+os-common.workspace = true
+
+[dev-dependencies]
+# e2e_real.rs：#[tokio::test]（macros）+ 多线程 runtime（rt-multi-thread）+
+# tokio::time::sleep（轮询探测就绪）+ tokio::net（端口探测备用）+ process（spawn os-api）。
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "net", "process"] }
+async-trait.workspace = true
+# e2e_real.rs：HTTP 客户端探测 os-api binary 就绪（轮询 /healthz）。
+reqwest.workspace = true
+
+[features]
+default = []
+# 提供 Mock 实现供下游（client-agent 等）测试
+mock = []
+
+# ============================================================================
+# Binary 入口（规划文档 §3.0/#19）：可执行 `os` CLI
+# ============================================================================
+# 本 crate 原为纯库（24 crate 之一，无 bin 入口），加 [[bin]] 后支持
+# `cargo run -p os-cli -- <args>` 与产物 `target/{debug,release}/os`。
+# bin 与 lib 共享同一份依赖（clap/tokio/reqwest/os-mobile 均已在 [dependencies]）。
+[[bin]]
+name = "os"
+path = "src/main.rs"

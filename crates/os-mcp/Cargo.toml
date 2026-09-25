@@ -1,0 +1,49 @@
+[package]
+name = "os-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS MCP Server——把 OS API 暴露为 MCP tools 供 AI 助手管理"
+
+[dependencies]
+# reqwest：内部 HTTP 客户端，调 os-api REST 网关（rustls-tls，与 os-cli 共栈）。
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+# tokio：async runtime（tools 是 async fn；stdio 读写经 tokio 异步 IO）。
+# binary 入口（main.rs）需 macros（#[tokio::main]）+ rt-multi-thread（多线程 runtime）+
+# io-util（BufReader/AsyncBufReadExt 按行读 stdin）+ signal（可选，本入口暂不需要）。
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-util", "time"] }
+# clap：binary 入口命令行参数（--server <url> 指定 os-api 地址）。
+clap.workspace = true
+thiserror.workspace = true
+
+# rmcp：官方 Rust MCP SDK。默认 features 已含 `server`。
+# 注意：本 crate **默认走手写最小 JSON-RPC over stdio**（更易测、表驱动 tools 注册，
+# 与 10 个统一无参 GET→JSON tools 的表驱动设计契合）。rmcp 仅在启用 `rmcp-transport`
+# feature 时作为可选 transport 链路（`ServiceExt::serve(stdio())`）。
+# 这样默认构建不引入 rmcp 的传递依赖（schemars / tokio-util 等），保持最小依赖面。
+rmcp = { workspace = true, optional = true }
+
+[dev-dependencies]
+# 测试用：多线程 + 时间（部分测用 #[tokio::test]）。
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-util", "time"] }
+
+[features]
+default = []
+# 切换到 rmcp 官方 transport（ServiceExt + stdio），替代手写 JSON-RPC 循环。
+# 默认不启用：手写 JSON-RPC 更易测 + 表驱动，且 rmcp #[tool] 宏要求每个 tool 是
+# 静态方法（与表驱动设计冲突）。保留此 feature 作为「官方 transport 接通」入口。
+rmcp-transport = ["dep:rmcp"]
+
+# ============================================================================
+# Binary 入口：可执行 `os-mcp`（stdio MCP server）
+# ============================================================================
+# 启动方式：`os-mcp --server http://127.0.0.1:8080`
+# MCP 客户端（Claude / ChatGPT 等支持 MCP 的客户端）把本进程作为子进程拉起，
+# 经 stdin/stdout 收发 JSON-RPC 2.0 消息（tools/list / tools/call / initialize）。
+[[bin]]
+name = "os-mcp"
+path = "src/main.rs"

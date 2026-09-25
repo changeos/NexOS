@@ -1,0 +1,85 @@
+/* =============================================================================
+   design/light.css —— 运行时 token 值域·浅色主题（三层 token 第 2 层之一）。
+
+   全部 --nx-* 变量在此给浅色缺省值（:root）；dark.css 以 [data-theme="dark"]
+   同名换值。变量命名全自创（nx = NexOS design），与宿主/旧页面 var(--…) 体系
+   完全隔离——旧页不读这些变量，暗色切换对旧页零影响。
+
+   值域设计（v0.1.7 UI 重设计第一批，Dify token 架构思路 + MaxKB 聚合徽章）：
+   · 背景五级：body 页底 / card 卡面 / subtle 微沉面 / hover 悬浮面 / burn 嵌入面
+   · 文字四级：primary 主文 / secondary 次文 / tertiary 弱文 / disabled 30% 透明
+   · 主色：点睛蓝 #0033ff 系（hover 底 #e9f0ff 浅蓝）
+   · 状态四色：绿/橙/红/蓝，各配浅底变体（徽章/提示条用）
+   · 阴影三档：xs/md/lg——同一几何偏移只调色 rgb(9 9 11 / .03 → .18)
+   · 圆角三级：卡 12 / 输入 8 / 徽章 6（pill 999）
+   · 排印刻度：12/13/14/16 px + semibold 600
+   ============================================================================= */
+
+:root {
+  color-scheme: light;
+
+  /* —— 背景五级 —— */
+  --nx-bg-body: #f2f4f7; /* 应用页底 */
+  --nx-bg-card: #ffffff; /* 卡片/浮层 */
+  --nx-bg-subtle: #fcfcfd; /* 微沉面（代码块/表尾/空态内衬） */
+  --nx-bg-hover: #f9fafb; /* 悬浮面（行 hover/次级按钮底） */
+  --nx-bg-burn: #e9ebf0; /* 嵌入面（选中底/进度槽/最深沉淀） */
+
+  /* —— 文字四级 —— */
+  --nx-text-primary: #101828;
+  --nx-text-secondary: #354052;
+  --nx-text-tertiary: #676f83;
+  --nx-text-disabled: rgb(16 24 40 / 0.3);
+  --nx-text-inverse: #ffffff; /* 深底上的文字（主色按钮/点选中） */
+
+  /* —— 主色（点睛蓝） —— */
+  --nx-accent: #0033ff;
+  --nx-accent-hover: #1a47ff; /* 主按钮 hover 深一档 */
+  --nx-accent-active: #0027cc; /* 主按钮 active 再深一档 */
+  --nx-accent-soft: #e9f0ff; /* 主色浅底（选中态/hover 底） */
+  --nx-accent-border: #b8ccff; /* 主色浅底描边 */
+
+  /* —— 状态四色（各配浅底变体） —— */
+  --nx-success: #17b26a;
+  --nx-success-bg: #e6f6ee;
+  --nx-success-border: #b8e8d0;
+  --nx-warning: #dc6803; /* 橙 #f79009 调深做正文可读档，bg 保留原橙浅底 */
+  --nx-warning-bg: #fef0dd;
+  --nx-warning-border: #fad58f;
+  --nx-info: #0033ff;
+  --nx-info-bg: #e9f0ff;
+  --nx-info-border: #b8ccff;
+  --nx-danger: #d92d20;
+  --nx-danger-bg: #feeceb;
+  --nx-danger-border: #f9c5bf;
+
+  /* —— 描边三级 —— */
+  --nx-line-regular: #e4e7ec; /* 卡 0.5px 静默描边 */
+  --nx-line-strong: #d0d5dd; /* 输入/可交互描边 */
+  --nx-line-divider: #eaecf1; /* 分隔线 */
+
+  /* —— 阴影三档（只调色不调偏移：0 2px 6px，rgb(9 9 11 / .03→.18)） —— */
+  --nx-shadow-xs: 0 2px 6px rgb(9 9 11 / 0.03);
+  --nx-shadow-md: 0 2px 6px rgb(9 9 11 / 0.1);
+  --nx-shadow-lg: 0 2px 6px rgb(9 9 11 / 0.18);
+
+  /* —— 圆角层级 —— */
+  --nx-radius-card: 12px;
+  --nx-radius-input: 8px;
+  --nx-radius-badge: 6px;
+  --nx-radius-pill: 999px;
+
+  /* —— 排印刻度（12/13/14/16 + semibold） —— */
+  --nx-font-size-xs: 12px;
+  --nx-font-size-sm: 13px;
+  --nx-font-size-base: 14px;
+  --nx-font-size-md: 16px;
+  --nx-font-weight-medium: 500;
+  --nx-font-weight-semibold: 600;
+  --nx-font-mono: var(--mono, ui-monospace, SFMono-Regular, Menlo, Consolas,
+    'Liberation Mono', monospace);
+
+  /* —— 焦点环（focus-visible 统一） —— */
+  --nx-ring-color: rgb(0 51 255 / 0.35);
+  --nx-ring-offset: 2px;
+}

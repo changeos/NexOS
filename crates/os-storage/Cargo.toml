@@ -1,0 +1,37 @@
+[package]
+name = "os-storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 存储层：ZFS 池/数据集/快照/配额/加密/send-recv 复制 + 块存储 export（iSCSI/NVMe-oF）"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+os-core.workspace = true
+os-common.workspace = true
+
+[features]
+# 提供 MockStorageBackend，供下游 protocol/compute/meta/service/provision 测试注入
+# （见 _conventions.md §5）。用法：[dev-dependencies] os-storage = { workspace = true, features = ["mock"] }
+default = []
+mock = []
+
+[dev-dependencies]
+# 性能基准（criterion）：micro-benchmark `zfs list` / `zpool list` 输出解析。
+# workspace 已注册（dev-only）；不进入 release 产物。
+criterion.workspace = true
+
+# 性能基准：ZFS CLI 输出解析（Pool/Dataset/Snapshot 的 from_list_line）。
+# harness=false 让 criterion 提供自己的 main。
+[[bench]]
+name = "zfs_parse"
+path = "benches/zfs_parse.rs"
+harness = false

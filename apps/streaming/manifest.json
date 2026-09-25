@@ -1,0 +1,10 @@
+{
+  "id": "streaming",
+  "name": "流媒体中心",
+  "version": "0.1.0",
+  "category": "media",
+  "icon": "<path d=\"M5 20l5-12\"/><path d=\"M19 20l-5-12\"/><path d=\"M8 14h8\"/><path d=\"M12 8V4\"/><circle cx=\"12\" cy=\"3\" r=\"1.4\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M9.5 6.5a3.5 3.5 0 0 0-2 3\"/><path d=\"M14.5 6.5a3.5 3.5 0 0 1 2 3\"/><path d=\"M7.5 5a6.5 6.5 0 0 0-3 5\"/><path d=\"M16.5 5a6.5 6.5 0 0 1 3 5\"/>",
+  "description": "拉流源 / 多机位节目切换 / 转码阶梯 / 推流目标 / 拉流转推流 + 直播（本地与联邦大厅）",
+  "entry": "web/entry.js",
+  "engine": "streaming"
+}

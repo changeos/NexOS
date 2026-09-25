@@ -1,0 +1,140 @@
+[package]
+name = "os-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 内嵌 API 网关：Axum REST+WebSocket + tower 中间件（TLS/限流/认证）（见规划文档 §3.6 / §9.1#10）（接口契约）"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+# base64：二维码文件传输 decode 端点接收前端上传的 media_base64 时解码落盘。
+base64.workspace = true
+# 网关库（Gateway/RouteHandler/Middleware）与 binary 入口（main.rs）共用。
+# binary 入口需要 macros（#[tokio::main]）+ rt-multi-thread + signal
+# （SIGTERM/SIGINT 优雅关闭 + net::TcpListener）。workspace tokio 已开 full
+# （含上述三项），此处显式标注 binary 所需 feature 以明意图（去耦 workspace 改动）。
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "net"] }
+async-trait.workspace = true
+os-core.workspace = true
+os-common.workspace = true
+os-security.workspace = true
+futures.workspace = true
+# 真实 HTTP 服务端栈（axum + tower + hyper），用于 InProcessGateway.start
+# 真实监听与 WebSocket Hub 推送（ADR-DEPS-001 已在 workspace 注册）
+axum.workspace = true
+tower.workspace = true
+hyper.workspace = true
+# binary 入口（main.rs）命令行参数解析（clap derive：--addr/--check/--routes）。
+# workspace 已注册（osd/os-cli 同款）。
+clap.workspace = true
+# 业务 RouteHandler 依赖（handlers/ 模块）：真实后端直连。
+# os-storage：ZfsCliBackend（StorageRouteHandler HTTP→zfs）。
+# os-compute：LibvirtVmManager + virt_check（ComputeRouteHandler HTTP→VM + SystemRouteHandler CPU 检测）。
+os-storage.workspace = true
+# os-compute：默认走内存态骨架（LibvirtVmManager：XML 渲染 + 状态机真实，无 libvirt 连接）。
+# 本机已装 libvirt-dev，virt-ffi feature 经验证可单独编译通过（`cargo build -p os-compute
+# --features virt-ffi`），但启用后 LibvirtVmManager 会切换为真实 libvirt 后端，运行期需连接
+# libvirt 守护进程，否则 list/create 等会失败、破坏既有内存态测试契约。故本批暂不启用，
+# VM 真实化经新增的 `GET /vms/:id/xml`（virsh dumpxml）与 `POST /vms/:id/snapshot`
+# （virsh snapshot-create）路由以 spawn virsh 方式接入（失败降级，不阻塞）。
+# 部署机上 libvirt 运行就绪后，可改为 `os-compute = { workspace = true, features = ["virt-ffi"] }`。
+os-compute.workspace = true
+# os-discover：PeerNode / NodeCapabilities（DiscoverRouteHandler HTTP→内存节点列表）。
+# 真实 mDNS 组播发现（MdnsDiscovery）需网络 + 后台任务，本 handler 先用内存节点态，
+# 后续接通真实 Discovery 时无需改 trait 签名（红线：内存态即可）。
+os-discover.workspace = true
+# os-nexhub：NexHub 两大 handler（代码仓库中心 code_repo + 大厅发现层
+# nexhub_lobby）已抽成独立 crate（NexHub 独立化，审计
+# docs/COMPONENT_INDEPENDENCE_AUDIT.md §6）。它们实现 os-common 网关契约
+# （RouteHandler + HandlerError），经本 crate gateway.rs 的契约桥接 blanket impl
+# 注册进网关（main.rs 装配）；http.rs 的 /git/* CGI 仓库根回退用
+# os_nexhub::repos_dir()。路由/环境变量/DB 路径运行期契约零变化。
+os-nexhub.workspace = true
+# os-p2p：点对点组网层（P2b 接入）。main.rs 在 NEXOS_P2P_ENABLE=1 时
+# P2pNode::spawn 内嵌组网节点（env 透传 NEXOS_P2P_BOOTSTRAP/LISTEN/PUBLIC/
+# KEY_FILE/NAME/MDNS）；handlers/p2p.rs 把 Handle 观察面（status/peers/
+# buckets/ladder/send/connect）适配为 REST。
+os-p2p.workspace = true
+# os-identity：身份账本（2026-08-25 从 os-p2p 抽离的独立组件）——指纹
+# （NodeID↔地址）证据登记 + 对比判定 + 冲突/失配观测 + JSON 持久化。
+# main.rs 建持久化共享实例（NEXOS_IDENTITY_FILE）注入 os-p2p 并自留一份给
+# handlers/identity.rs 暴露 REST 观察面（/api/v1/identity/*）。
+os-identity.workspace = true
+# os-update：「更新」桌面应用（handlers/update.rs）的版本/通道/槽位逻辑来源：
+# semver 解析比较（version.rs）+ A/B 槽位状态机（slot.rs）。只复用其纯逻辑层，
+# 不触发 reqwest 下载 / bootloader 激活等真实 I/O（本期更新通道预留，
+# 语义见 docs/UPDATE_APP.md）。
+os-update.workspace = true
+# os-iso：「系统自举」桌面应用（handlers/provisioning.rs）的 ISO 构建真实驱动：
+# XorrisoIsoBuilder（mksquashfs/xorriso/sha256sum 编排）+ env 工具链探测
+# （xorriso/mksquashfs 缺失时构建任务 failed 附安装指引）。os-api 侧用
+# runner::IsoBuildRunner 自实现 LoggingIsoRunner 记录每步构建日志，不改 os-iso pub API。
+os-iso.workspace = true
+# Web UI 静态资源内嵌（rust-embed）：编译期把 crates/os-api/static/ 打进 binary，
+# 运行期经 webui 模块 + axum fallback 对外服务（/ → index.html，/static/* → 资源）。
+rust-embed.workspace = true
+# API 网关（api_gateway.rs）持久化：rusqlite（bundled 内嵌 sqlite3，无系统依赖）。
+# 渠道/令牌/日志/映射落 SQLite，重启不丢。workspace 已注册（os-meta 同款选型）。
+rusqlite.workspace = true
+# rustify：HTTP 客户端从 curl 子进程迁移到 reqwest（api_gateway 代理转发 /
+# llm vLLM 探测推理 / media TMDB 刮削+AI 相册 / downloads aria2 RPC / streaming
+# MediaMTX 探活）。once_cell 提供进程级共享 Client（连接池复用，避免每请求新建）。
+reqwest.workspace = true
+once_cell.workspace = true
+# rustify：QR 生成/解码纯 Rust（qr_transfer：qrcode 生成 + rqrr 解码 + image PNG 编解码，
+# 替代 python3 qrcode/pyzbar 子进程；ffmpeg 拆帧/合成仍保留子进程）。
+qrcode.workspace = true
+rqrr.workspace = true
+image.workspace = true
+# rustify：钱包密钥学纯 Rust（blockchain：k256 secp256k1 + tiny-keccak keccak256
+# 派生 EVM 地址，替代 python3 keccak 脚本子进程）。
+k256.workspace = true
+tiny-keccak.workspace = true
+# hex：私钥/地址十六进制编解码（blockchain 钱包派生）；sha2：bitcoin/custom 链
+# 地址降级摘要（与原 python 脚本 sha256(pubkey)[:20] 行为对齐）。
+hex.workspace = true
+sha2.workspace = true
+# portable-pty：纯 Rust 跨平台 PTY（「管理」桌面应用 Web 终端，handlers/terminal.rs）。
+# 本地终端 spawn bash / SSH 终端 spawn `ssh -tt`（密码提示经 PTY 透传给浏览器
+# xterm.js），MasterPty/Child 抽象覆盖 resize/读写/kill/等待退出码。
+portable-pty.workspace = true
+
+# binary 入口：os-api HTTP 网关可执行（tokio::main + clap 参数 + --check 诊断 +
+# axum::serve 真实 HTTP 监听 + SIGTERM/SIGINT 优雅关闭）。
+[[bin]]
+name = "os-api"
+path = "src/main.rs"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "net", "time"] }
+# 测试用：通过 tower::ServiceExt::oneshot 对 Router 发起单次请求（不真监听端口）
+tower = { workspace = true, features = ["util"] }
+# 测试用：HTTP 客户端，验证 InProcessGateway 真实 axum::serve 监听后请求可达
+reqwest.workspace = true
+# 测试用（e2e_real.rs）：真实 ZfsCliBackend 已在 [dependencies]（os-storage）。
+# 测试用：WebSocket 客户端（与 axum::serve ws 升级端点真实握手；版本对齐 axum 0.8 ws）
+tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect"] }
+# 测试用：断言 `GET /status` 响应能反序列化为 `os_mobile::SystemStatus`
+# （客户端契约，CLI/desktop 共用）——batch14 发现的 schema 错配回归测依赖此类型。
+# dev-only，无循环依赖（os-mobile 不依赖 os-api）。
+os-mobile.workspace = true
+# 性能基准（criterion）：micro-benchmark 路由注册表匹配（大量 RouteSpec）。
+# workspace 已注册（dev-only）；不进入 release 产物。
+criterion.workspace = true
+
+# 性能基准：路由注册表匹配（线性扫描 + specificity 排序）。
+# harness=false 让 criterion 提供自己的 main。
+[[bench]]
+name = "routing"
+path = "benches/routing.rs"
+harness = false
+
+[features]
+default = []
+# 提供 Mock 实现供下游（client-agent 等）测试
+mock = []

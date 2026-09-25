@@ -1,0 +1,60 @@
+# Rust 构建产物
+/target
+
+# Cargo 锁文件策略：
+# 契约/库 workspace 提交 Cargo.lock 以保证可复现编译；
+# 若未来转为纯库分发（非二进制产品），可改回忽略。
+# （当前保留纳入版本控制，见仓库根 Cargo.lock）
+
+# 编辑器/IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CLIP 模型权重（ADR-DEPS-005 真实接通）：不入 git（~600MB safetensors + tokenizer.json）。
+# 默认缓存在 ~/.cache/os-clip/；本地模型目录（如 ./models/）也忽略。
+# 红线：权重不入版本控制（仓库膨胀 + 非源码资产）。
+models/
+*.safetensors
+os-clip/
+
+# Vue3 前端构建产物（feature/vue3-build-integrate）：
+# crates/os-api/static-dist/ 由 `make web`（= crates/os-api/web/ 下 npm run build）
+# 产出，rust-embed 在编译期内嵌。红线：构建产物不入 git（非源码资产 + hash 化文件名）。
+crates/os-api/static-dist/
+
+# Vue3 前端依赖（npm）：不入 git（体积大 + 可由 package.json 重现）。
+crates/os-api/web/node_modules/
+
+# Vite 临时缓存。
+crates/os-api/web/.vite/
+gateway.db
+llm.db
+llm.db-*
+gateway.db-*
+# TMDB 媒体元数据刮削 SQLite（feature/media-scrape）：new() 默认文件库，测试/运行产物。
+media.db
+media.db-*
+# 监控告警持久化 SQLite（feature/chat-alert）：new() 默认文件库，测试/运行产物。
+monitor.db
+monitor.db-*
+# IM 对话/消息持久化 SQLite（feature/im-real）：new() 默认文件库，测试/运行产物。
+im.db
+# NexHub 大厅发布索引 SQLite（feature/nexhub-lobby）：运行产物。
+hub_lobby.db
+hub_lobby.db-*
+# 转发工具 SQLite（feature/forwarding）：运行产物。
+forwarding.db
+forwarding.db-*
+im.db-*
+# 模型大厅发布索引 SQLite（feature/modelhub-lobby）：运行产物。
+model_lobby.db
+model_lobby.db-*
+api_market.db
+api_market.db-*
