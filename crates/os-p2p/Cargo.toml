@@ -1,0 +1,57 @@
+[package]
+name = "os-p2p"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 系统点对点组网：Swarm 同款全分布式 Kademlia（NodeID=secp256k1 公钥/OverlayAddr=EVM 同源 20 字节）+ ECDH+AES-256-GCM 链路加密 + 观测端点八卦 + TCP 打洞连接阶梯 + mDNS LAN 种子 + NAT 中继（设计 docs/NEXOS_P2P_NETWORK_DESIGN.md，P1+P2a）"
+
+[dependencies]
+# 帧编解码（长度前缀 JSON 信封）与握手载荷。
+serde.workspace = true
+serde_json.workspace = true
+# 本 crate 错误类型（P2pError：传输/握手/路由）。
+thiserror.workspace = true
+# 异步运行时：TCP 监听/拨号 + 帧收发任务 + 定时器（桶刷新/ping 剔除）。
+tokio.workspace = true
+# 结构化日志（组网事件可观测：握手/路由/剔除）。
+tracing.workspace = true
+# NodeID 密钥学（chain_auth 契约同栈）：压缩公钥解析/验签/EVM 展示名派生。
+os-common.workspace = true
+# 签名侧（chain_auth 只提供验签）：SigningKey 生成 + SHA-256 摘要可恢复签名
+# （与 os-common::chain_auth::verify_nonce_signature 逐字节兼容）。
+# ecdh feature（P2a）：EphemeralSecret/SharedSecret——握手时互发临时公钥做 ECDH，
+# 派生每连接 AES-256-GCM 会话密钥（签名覆盖临时公钥防 MITM）。
+k256 = { workspace = true, features = ["ecdh"] }
+# OverlayAddr = keccak256(未压缩公钥[1..])[12..]（与 chain_auth 派生同源，
+# 这里取原始 20 字节而非展示名 hex）。
+tiny-keccak.workspace = true
+hex.workspace = true
+# 挑战签名摘要：SHA-256(nonce) → RFC6979 可恢复 ECDSA（NodeIdentity::sign，
+# 与 chain_auth 验签契约逐字节兼容——chain_auth 仅提供验签侧）。
+sha2.workspace = true
+# P2a 链路加密：ECDH 共享密钥派生后的帧级 AES-256-GCM（长度前缀+nonce+密文，
+# ADR-DEPS-003 注册的纯 Rust AEAD，与 reqwest/rustls 的 ring 后端不冲突）。
+aes-gcm.workspace = true
+# P2a 打洞配套：listener 以 SO_REUSEADDR 绑定（Unix），出站拨号 socket 可绑定
+# 与监听相同的本地端口——映射复用式 TCP 同时打开的前提（tokio TcpSocket 负责
+# 拨号侧；本依赖负责监听侧）。与 tokio 传递依赖共版本（lockfile 既有 0.6）。
+socket2 = "0.6"
+# P2a mDNS LAN 种子：_nexos-p2p._tcp 服务广播/发现（纯 Rust 无 avahi 依赖，
+# ADR-DEPS-002 注册；与 avahi 的 _nexos._tcp 通告区分）。
+mdns-sd.workspace = true
+# 身份账本（2026-08-25 抽离的独立组件）：指纹（NodeID↔地址）证据登记 + 对比
+# 判定 + 冲突/失配观测 + JSON 持久化。本 crate 回归纯传输层——握手/探测产出
+# 事实事件写进账本，「记谁/信谁/地址属于谁」的策略全部外移。架构见
+# docs/IDENTITY_COMPONENT.md。
+os-identity.workspace = true
+# 传输组件（transfer.rs，2026-08-25）：分块字节经 overlay JSON 帧 base64
+# 编解码（二进制帧化是后续路线，见 docs/TRANSFER_COMPONENT.md）。
+base64.workspace = true
+
+[dev-dependencies]
+# 集成测试（tests/topology.rs + tests/ladder.rs + tests/cli.rs）：单机多实例
+# （随机端口）拓扑组网/收敛/kill 自愈/离线消息/打洞/连接阶梯/CLI 冒烟。
+# 集成测试是独立 crate，需自带 tokio（workspace 根已含 full）。
+tokio.workspace = true

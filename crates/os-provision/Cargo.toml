@@ -1,0 +1,27 @@
+[package]
+name = "os-provision"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 系统分发/迁移：PXE 自举 + 阶段化迁移（手机换机式，见规划文档 §3.10 / §3.19）（接口契约）"
+
+[features]
+default = []
+# 提供 MockProvisioner / MockMigrationEngine（见 src/mock.rs），供下游 cli/api 测试注入。
+# 用法：[dev-dependencies] os-provision = { workspace = true, features = ["mock"] }
+mock = []
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+os-core.workspace = true
+os-common.workspace = true
+os-storage.workspace = true
+os-network.workspace = true
+os-discover.workspace = true
+os-meta.workspace = true

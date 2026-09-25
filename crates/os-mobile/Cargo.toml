@@ -1,0 +1,31 @@
+[package]
+name = "os-mobile"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 手机客户端（iOS/Android）Rust 核心 SDK：发现/连接/状态/配对/推送（见规划文档 §3.15）（接口契约）"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+# 真实 HTTP 传输（ADR-DEPS-001：rustls-tls，无 openssl）——HttpOsClient 经网关
+# REST 调用 os-api；HTTP/WS 服务端归 api-agent。
+reqwest.workspace = true
+os-core.workspace = true
+os-common.workspace = true
+os-discover.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[features]
+default = []
+# 提供 Mock 实现供前端/UI 测试
+mock = []

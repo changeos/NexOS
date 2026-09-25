@@ -1,0 +1,1832 @@
+/* =============================================================================
+   design/theme.css —— 三层 token 第 1 层：Tailwind v4 注册 + 语义映射 + 组件基座类。
+
+   结构（Dify token 架构思路自建，命名全自创 nx-*）：
+   ① 值域层：light.css / dark.css（运行时 CSS 变量，[data-theme=dark] 同名换值）
+   ② 注册层：本文件 @theme inline 把语义名指到运行时变量——模板里可用
+      bg-card / text-ink-3 / shadow-md / rounded-card / text-sm 等语义工具类，
+      且随 [data-theme] 运行时换肤（inline = 工具类直接内联 var(...) 引用）
+   ③ 组件层：nx-btn / nx-card / nx-badge / nx-pop / nx-progress 基座类 +
+      .nx-page 作用域内对旧共享钩子类（fh-card/fh-row/fh-tab…）的视觉覆写——
+      只在试点页根节点挂 .nx-page 时生效，旧页面不受影响（命名空间隔离）。
+
+   Tailwind 引入方式：**不引 preflight**（分层 base 全局重置会波及旧页），只取
+   theme + utilities；utilities 不加 @layer——与 flow.css 一样处于无层状态，
+   靠引入顺序（FilmStudio 中 flow.css 先、本文件后）在等特异性下胜出。
+   ============================================================================= */
+
+@import './light.css';
+@import './dark.css';
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css';
+
+/* —— ② 注册层：语义名 → 运行时变量（inline：工具类内联 var 引用，可换肤） —— */
+/* 缺省调色板裁剪：本项目只用上面的语义色（体积：少发射 ~100 个默认色变量） */
+@theme {
+  --color-*: initial;
+}
+
+@theme inline {
+  /* 背景五级 */
+  --color-body: var(--nx-bg-body);
+  --color-card: var(--nx-bg-card);
+  --color-subtle: var(--nx-bg-subtle);
+  --color-hover: var(--nx-bg-hover);
+  --color-burn: var(--nx-bg-burn);
+
+  /* 主色（点睛蓝） */
+  --color-accent: var(--nx-accent);
+  --color-accent-hover: var(--nx-accent-hover);
+  --color-accent-soft: var(--nx-accent-soft);
+  --color-accent-border: var(--nx-accent-border);
+  --color-on-accent: var(--nx-text-inverse);
+
+  /* 文字四级 */
+  --color-ink: var(--nx-text-primary);
+  --color-ink-2: var(--nx-text-secondary);
+  --color-ink-3: var(--nx-text-tertiary);
+  --color-ink-off: var(--nx-text-disabled);
+
+  /* 状态四色 + 浅底变体 */
+  --color-success: var(--nx-success);
+  --color-success-bg: var(--nx-success-bg);
+  --color-success-border: var(--nx-success-border);
+  --color-warning: var(--nx-warning);
+  --color-warning-bg: var(--nx-warning-bg);
+  --color-warning-border: var(--nx-warning-border);
+  --color-danger: var(--nx-danger);
+  --color-danger-bg: var(--nx-danger-bg);
+  --color-danger-border: var(--nx-danger-border);
+  --color-info: var(--nx-info);
+  --color-info-bg: var(--nx-info-bg);
+  --color-info-border: var(--nx-info-border);
+
+  /* 描边 */
+  --color-line: var(--nx-line-regular);
+  --color-line-strong: var(--nx-line-strong);
+  --color-line-divider: var(--nx-line-divider);
+
+  /* 阴影三档（覆盖 Tailwind 缺省：只调色不调偏移） */
+  --shadow-xs: var(--nx-shadow-xs);
+  --shadow-md: var(--nx-shadow-md);
+  --shadow-lg: var(--nx-shadow-lg);
+
+  /* 圆角层级 */
+  --radius-card: var(--nx-radius-card);
+  --radius-input: var(--nx-radius-input);
+  --radius-badge: var(--nx-radius-badge);
+
+  /* 排印刻度 12/13/14/16（覆盖 --text-sm 为 13px；新增 --text-md 16px） */
+  --text-xs: var(--nx-font-size-xs);
+  --text-xs--line-height: 1.5;
+  --text-sm: var(--nx-font-size-sm);
+  --text-sm--line-height: 1.55;
+  --text-base: var(--nx-font-size-base);
+  --text-base--line-height: 1.6;
+  --text-md: var(--nx-font-size-md);
+  --text-md--line-height: 1.5;
+  --text-md--letter-spacing: -0.01em;
+}
+
+/* =============================================================================
+   ③ 组件基座类（nx-*；无 @layer——保证能覆写旧页无层规则，见文件头说明）
+   ============================================================================= */
+
+/* —— 页作用域：试点页根节点挂 .nx-page，文字/底色进 token 体系 —— */
+.nx-page {
+  color: var(--nx-text-primary);
+  font-size: var(--nx-font-size-base);
+}
+
+/* —— 焦点环（键盘可达；所有可交互基座统一挂 .nx-focus 语义） —— */
+.nx-focus:focus-visible,
+.nx-page .fh-btn:focus-visible {
+  outline: 2px solid var(--nx-ring-color);
+  outline-offset: var(--nx-ring-offset);
+}
+
+/* —— NxButton：primary / secondary / ghost / destructive × sm / md —— */
+.nx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--nx-radius-input);
+  font-family: inherit;
+  font-size: var(--nx-font-size-sm);
+  font-weight: var(--nx-font-weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  text-decoration: none;
+  user-select: none;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.nx-btn--sm {
+  height: 28px;
+  padding: 0 10px;
+  font-size: var(--nx-font-size-xs);
+}
+.nx-btn:disabled {
+  cursor: not-allowed;
+}
+/* secondary（缺省）：描边次级钮 */
+.nx-btn--secondary {
+  background: var(--nx-bg-card);
+  border-color: var(--nx-line-strong);
+  color: var(--nx-text-secondary);
+}
+.nx-btn--secondary:hover:not(:disabled) {
+  background: var(--nx-bg-hover);
+  border-color: var(--nx-line-strong);
+  color: var(--nx-text-primary);
+}
+.nx-btn--secondary:active:not(:disabled) {
+  background: var(--nx-bg-burn);
+}
+.nx-btn--secondary:disabled {
+  background: transparent;
+  border-color: var(--nx-line-regular);
+  color: var(--nx-text-disabled);
+}
+/* primary：点睛蓝实底 */
+.nx-btn--primary {
+  background: var(--nx-accent);
+  border-color: var(--nx-accent);
+  color: var(--nx-text-inverse);
+}
+.nx-btn--primary:hover:not(:disabled) {
+  background: var(--nx-accent-hover);
+  border-color: var(--nx-accent-hover);
+}
+.nx-btn--primary:active:not(:disabled) {
+  background: var(--nx-accent-active);
+  border-color: var(--nx-accent-active);
+}
+.nx-btn--primary:disabled {
+  background: var(--nx-bg-burn);
+  border-color: var(--nx-bg-burn);
+  color: var(--nx-text-disabled);
+}
+/* ghost：无描边弱化钮 */
+.nx-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--nx-text-tertiary);
+}
+.nx-btn--ghost:hover:not(:disabled) {
+  background: var(--nx-bg-hover);
+  color: var(--nx-text-primary);
+}
+.nx-btn--ghost:active:not(:disabled) {
+  background: var(--nx-bg-burn);
+}
+.nx-btn--ghost:disabled {
+  color: var(--nx-text-disabled);
+}
+/* destructive：危险描边钮（行内重试/删除） */
+.nx-btn--destructive {
+  background: var(--nx-bg-card);
+  border-color: var(--nx-danger-border);
+  color: var(--nx-danger);
+}
+.nx-btn--destructive:hover:not(:disabled) {
+  background: var(--nx-danger-bg);
+  border-color: var(--nx-danger);
+}
+.nx-btn--destructive:active:not(:disabled) {
+  background: var(--nx-danger-bg);
+}
+.nx-btn--destructive:disabled {
+  background: transparent;
+  border-color: var(--nx-line-regular);
+  color: var(--nx-text-disabled);
+}
+/* 载入 spinner（busy 态；兼挂 fh-spin/is-spinning 钩子——任务条动画复用） */
+.nx-btn__spin {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: nx-spin 0.7s linear infinite;
+}
+@keyframes nx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* —— NxCard：三态（静默描边 / hover 浮起 / 选中）+ 0.5px 描边 —— */
+.nx-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--nx-bg-card);
+  border: 0.5px solid var(--nx-line-regular);
+  border-radius: var(--nx-radius-card);
+  box-shadow: var(--nx-shadow-xs);
+}
+.nx-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border-bottom: 0.5px solid var(--nx-line-divider);
+  font-size: var(--nx-font-size-base);
+  font-weight: var(--nx-font-weight-semibold);
+  color: var(--nx-text-primary);
+  flex-shrink: 0;
+}
+.nx-card__body {
+  flex: 1;
+  min-height: 0;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* 横向工具行形态（管线操作条等）：纵列骨架改横排换行 */
+.nx-card__body--row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.nx-card.is-flat {
+  background: var(--nx-bg-subtle);
+  border-color: var(--nx-line-divider);
+  box-shadow: none;
+}
+/* 可交互卡（大厅项目卡）：静默→hover 浮起（shadow-md+换底）→选中（accent+shadow-lg） */
+.nx-card.is-interactive {
+  cursor: pointer;
+  transition:
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+.nx-card.is-interactive:hover {
+  box-shadow: var(--nx-shadow-md);
+  border-color: var(--nx-line-strong);
+  background: var(--nx-bg-subtle);
+  transform: translateY(-1px);
+}
+.nx-card.is-interactive:active {
+  transform: translateY(0);
+  box-shadow: var(--nx-shadow-xs);
+}
+.nx-card.is-interactive.is-selected,
+.nx-card.is-interactive:focus-visible {
+  border-color: var(--nx-accent);
+  box-shadow: var(--nx-shadow-lg);
+  outline: 2px solid var(--nx-ring-color);
+  outline-offset: 2px;
+}
+
+/* —— NxBadge：soft 浅底六色 + solid + StatusDot 光晕变体 —— */
+.nx-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--nx-radius-badge);
+  font-family: inherit;
+  font-size: var(--nx-font-size-xs);
+  font-weight: var(--nx-font-weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.nx-badge--sm {
+  height: 18px;
+  padding: 0 6px;
+  gap: 4px;
+}
+.nx-badge--neutral {
+  background: var(--nx-bg-hover);
+  border-color: var(--nx-line-regular);
+  color: var(--nx-text-secondary);
+}
+.nx-badge--accent {
+  background: var(--nx-accent-soft);
+  border-color: var(--nx-accent-border);
+  color: var(--nx-accent);
+}
+.nx-badge--success {
+  background: var(--nx-success-bg);
+  border-color: var(--nx-success-border);
+  color: var(--nx-success);
+}
+.nx-badge--warning {
+  background: var(--nx-warning-bg);
+  border-color: var(--nx-warning-border);
+  color: var(--nx-warning);
+}
+.nx-badge--danger {
+  background: var(--nx-danger-bg);
+  border-color: var(--nx-danger-border);
+  color: var(--nx-danger);
+}
+.nx-badge--info {
+  background: var(--nx-info-bg);
+  border-color: var(--nx-info-border);
+  color: var(--nx-info);
+}
+/* solid：实底（当前阶段/强调位） */
+.nx-badge--solid-accent {
+  background: var(--nx-accent);
+  border-color: var(--nx-accent);
+  color: var(--nx-text-inverse);
+}
+.nx-badge--solid-success {
+  background: var(--nx-success);
+  border-color: var(--nx-success);
+  color: #ffffff; /* 绿实底上的文字：深浅两主题均取纯白（token 反色在此对比不足） */
+}
+/* StatusDot：徽章内状态点；pulse 变体带呼吸光晕（运行中任务） */
+.nx-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.nx-badge__dot--pulse {
+  animation: nx-pulse 1.6s ease-out infinite;
+}
+@keyframes nx-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* —— NxPopover：浮层基座（fixed 定位，组件按触发器矩形计算坐标） —— */
+.nx-pop {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+}
+.nx-pop__trigger {
+  display: inline-flex;
+  cursor: pointer;
+}
+.nx-pop__panel {
+  position: fixed;
+  z-index: 520;
+  min-width: 200px;
+  max-width: 340px;
+  padding: 10px 12px;
+  background: var(--nx-bg-card);
+  border: 0.5px solid var(--nx-line-strong);
+  border-radius: var(--nx-radius-card);
+  box-shadow: var(--nx-shadow-lg);
+  color: var(--nx-text-secondary);
+  font-size: var(--nx-font-size-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: nx-pop-in 0.12s ease;
+}
+@keyframes nx-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.nx-pop__title {
+  font-size: var(--nx-font-size-xs);
+  font-weight: var(--nx-font-weight-semibold);
+  color: var(--nx-text-tertiary);
+  text-transform: none;
+}
+
+/* —— NxProgress：离散/不确定进度条 —— */
+.nx-progress {
+  width: 100%;
+  height: 6px;
+  border-radius: var(--nx-radius-pill);
+  background: var(--nx-bg-burn);
+  overflow: hidden;
+}
+.nx-progress--sm {
+  height: 4px;
+}
+.nx-progress__bar {
+  height: 100%;
+  border-radius: var(--nx-radius-pill);
+  background: var(--nx-accent);
+  transition: width 0.35s ease;
+}
+.nx-progress--success .nx-progress__bar {
+  background: var(--nx-success);
+}
+.nx-progress--danger .nx-progress__bar {
+  background: var(--nx-danger);
+}
+.nx-progress__bar.is-indeterminate {
+  width: 38% !important;
+  animation: nx-slide 1.1s ease-in-out infinite;
+}
+@keyframes nx-slide {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
+}
+
+/* —— 表单：输入/下拉（token 化；focus 环三件套） —— */
+.nx-input,
+.nx-select {
+  font-family: inherit;
+  font-size: var(--nx-font-size-sm);
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--nx-line-strong);
+  border-radius: var(--nx-radius-input);
+  background: var(--nx-bg-card);
+  color: var(--nx-text-primary);
+  min-width: 0;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.nx-input::placeholder {
+  color: var(--nx-text-tertiary);
+}
+.nx-input:focus-visible,
+.nx-select:focus-visible {
+  outline: none;
+  border-color: var(--nx-accent);
+  box-shadow: 0 0 0 3px var(--nx-ring-color);
+}
+.nx-input:disabled,
+.nx-select:disabled {
+  background: var(--nx-bg-subtle);
+  color: var(--nx-text-disabled);
+  cursor: not-allowed;
+}
+.nx-input--pill {
+  border-radius: var(--nx-radius-pill);
+  padding: 0 14px;
+}
+.nx-select {
+  cursor: pointer;
+}
+
+/* —— 列表行：hover/选中/失败三态 —— */
+.nx-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--nx-radius-input);
+  background: transparent;
+  font-size: var(--nx-font-size-sm);
+  color: var(--nx-text-secondary);
+  min-width: 0;
+  flex-wrap: wrap;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.nx-row.is-clickable {
+  cursor: pointer;
+}
+.nx-row.is-clickable:hover {
+  background: var(--nx-bg-hover);
+}
+.nx-row.is-active {
+  background: var(--nx-accent-soft);
+  border-color: var(--nx-accent-border);
+  color: var(--nx-text-primary);
+}
+.nx-row.is-failed {
+  background: var(--nx-danger-bg);
+  border-color: var(--nx-danger-border);
+}
+.nx-row.is-clickable:focus-visible {
+  outline: 2px solid var(--nx-ring-color);
+  outline-offset: -2px;
+}
+
+/* —— 提示条（信息/成功/警告/危险） —— */
+.nx-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border: 1px solid var(--nx-line-regular);
+  border-radius: var(--nx-radius-input);
+  background: var(--nx-bg-subtle);
+  color: var(--nx-text-secondary);
+  font-size: var(--nx-font-size-sm);
+  word-break: break-all;
+}
+.nx-alert--danger {
+  background: var(--nx-danger-bg);
+  border-color: var(--nx-danger-border);
+  color: var(--nx-danger);
+}
+.nx-alert--warning {
+  background: var(--nx-warning-bg);
+  border-color: var(--nx-warning-border);
+  color: var(--nx-warning);
+}
+.nx-alert--success {
+  background: var(--nx-success-bg);
+  border-color: var(--nx-success-border);
+  color: var(--nx-success);
+}
+.nx-alert--info {
+  background: var(--nx-info-bg);
+  border-color: var(--nx-info-border);
+  color: var(--nx-info);
+}
+
+/* —— 空态 / 骨架屏 —— */
+.nx-empty {
+  padding: 40px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--nx-text-tertiary);
+  font-size: var(--nx-font-size-sm);
+  border: 1px dashed var(--nx-line-strong);
+  border-radius: var(--nx-radius-card);
+  background: var(--nx-bg-subtle);
+}
+.nx-skeleton {
+  position: relative;
+  overflow: hidden;
+  border: 0.5px solid var(--nx-line-regular);
+  border-radius: var(--nx-radius-card);
+  background: var(--nx-bg-card);
+}
+.nx-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--nx-bg-hover) 70%, var(--nx-bg-card)),
+    transparent
+  );
+  animation: nx-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes nx-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* —— Tab（试点页作用域内覆写共享钩子 .fh-tab：药丸→方角刻面） —— */
+.nx-page .fh-tab {
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--nx-radius-input);
+  background: transparent;
+  color: var(--nx-text-tertiary);
+  font-family: inherit;
+  font-size: var(--nx-font-size-sm);
+  font-weight: var(--nx-font-weight-medium);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+.nx-page .fh-tab:hover {
+  background: var(--nx-bg-hover);
+  color: var(--nx-text-primary);
+}
+.nx-page .fh-tab.is-active {
+  background: var(--nx-accent-soft);
+  border-color: var(--nx-accent-border);
+  color: var(--nx-accent);
+  font-weight: var(--nx-font-weight-semibold);
+}
+.nx-page .fh-tab:focus-visible {
+  outline: 2px solid var(--nx-ring-color);
+  outline-offset: 1px;
+}
+
+/* =============================================================================
+   .nx-page 作用域：旧共享钩子类的视觉覆写（布局骨架保留在 flow.css）
+   —— 等特异性 + 后引入 ⇒ 覆写生效；旧页（无 .nx-page 根）完全不读这些规则。
+   ============================================================================= */
+
+/* 卡片钩子 → nx-card 三态视觉 */
+.nx-page .fh-card {
+  background: var(--nx-bg-card);
+  border: 0.5px solid var(--nx-line-regular);
+  border-radius: var(--nx-radius-card);
+  box-shadow: var(--nx-shadow-xs);
+}
+.nx-page .fh-card.is-dragover {
+  outline: 2px dashed var(--nx-accent);
+  outline-offset: -4px;
+}
+.nx-page .fh-card-head {
+  padding: 10px 16px;
+  border-bottom: 0.5px solid var(--nx-line-divider);
+  font-size: var(--nx-font-size-base);
+  font-weight: var(--nx-font-weight-semibold);
+  color: var(--nx-text-primary);
+}
+.nx-page .fh-card-body {
+  padding: 14px 16px;
+  gap: 10px;
+}
+.nx-page .fh-head-actions {
+  gap: 8px;
+}
+
+/* 列表行钩子 → nx-row 三态 */
+.nx-page .fh-row {
+  border: 1px solid transparent;
+  border-radius: var(--nx-radius-input);
+  background: transparent;
+  font-size: var(--nx-font-size-sm);
+  color: var(--nx-text-secondary);
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.nx-page .fh-row:hover {
+  background: var(--nx-bg-hover);
+}
+.nx-page .fh-row.is-active {
+  background: var(--nx-accent-soft);
+  border-color: var(--nx-accent-border);
+  color: var(--nx-text-primary);
+}
+
+/* 徽章钩子 .fh-pill → 6px 圆角刻面 + 状态四色 */
+.nx-page .fh-pill {
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--nx-radius-badge);
+  font-size: var(--nx-font-size-xs);
+  border: 1px solid var(--nx-line-regular);
+  background: var(--nx-bg-hover);
+  color: var(--nx-text-secondary);
+  line-height: 1.4;
+}
+.nx-page .fh-pill-mini {
+  font-size: var(--nx-font-size-xs);
+  padding: 1px 6px;
+}
+.nx-page .fh-pill-ok {
+  background: var(--nx-success-bg);
+  border-color: var(--nx-success-border);
+  color: var(--nx-success);
+}
+/* 已入库（v0.1.44 并入件）：绿实底白字——源状态最高显示档（分章定稿冻结，
+   清理/分章锁定；深浅两主题的 success 绿均够深，白字对比成立） */
+.nx-page .fh-pill-ingested {
+  background: var(--nx-success);
+  border-color: var(--nx-success);
+  color: #fff;
+}
+.nx-page .fh-pill-err {
+  background: var(--nx-danger-bg);
+  border-color: var(--nx-danger-border);
+  color: var(--nx-danger);
+}
+.nx-page .fh-pill-blue {
+  background: var(--nx-info-bg);
+  border-color: var(--nx-info-border);
+  color: var(--nx-info);
+}
+.nx-page .fh-pill-violet {
+  background: var(--nx-accent-soft);
+  border-color: var(--nx-accent-border);
+  color: var(--nx-accent);
+}
+.nx-page .fh-pill-amber {
+  background: var(--nx-warning-bg);
+  border-color: var(--nx-warning-border);
+  color: var(--nx-warning);
+}
+.nx-page .fh-pill-muted {
+  color: var(--nx-text-tertiary);
+}
+
+/* 页头（FlowPageHead 挂 .nx-pagehead 后的视觉；标题口径全页共用） */
+.nx-page .fh-head-title {
+  font-size: var(--nx-font-size-md);
+  font-weight: var(--nx-font-weight-semibold);
+  color: var(--nx-text-primary);
+  letter-spacing: -0.01em;
+}
+/* 按钮（第二批泛化：页头之外的 fh-btn——对象卡认领/合成页/音频页/模型页/
+   树卡小钮等——统一 nx-btn secondary 刻面；primary/danger/尺寸档对齐） */
+.nx-page .fh-btn {
+  padding: 6px 12px;
+  border-radius: var(--nx-radius-input);
+  border: 1px solid var(--nx-line-strong);
+  background: var(--nx-bg-card);
+  color: var(--nx-text-secondary);
+  font-family: inherit;
+  font-size: var(--nx-font-size-sm);
+  font-weight: var(--nx-font-weight-medium);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.nx-page .fh-btn:hover:not(:disabled) {
+  background: var(--nx-bg-hover);
+  border-color: var(--nx-line-strong);
+  color: var(--nx-text-primary);
+}
+.nx-page .fh-btn:active:not(:disabled) {
+  background: var(--nx-bg-burn);
+}
+.nx-page .fh-btn:disabled {
+  background: transparent;
+  border-color: var(--nx-line-regular);
+  color: var(--nx-text-disabled);
+  cursor: not-allowed;
+}
+.nx-page .fh-btn:focus-visible {
+  outline: 2px solid var(--nx-ring-color);
+  outline-offset: var(--nx-ring-offset);
+}
+.nx-page .fh-btn-primary {
+  background: var(--nx-accent);
+  border-color: var(--nx-accent);
+  color: var(--nx-text-inverse);
+}
+.nx-page .fh-btn-primary:hover:not(:disabled) {
+  background: var(--nx-accent-hover);
+  border-color: var(--nx-accent-hover);
+  color: var(--nx-text-inverse);
+}
+.nx-page .fh-btn-primary:active:not(:disabled) {
+  background: var(--nx-accent-active);
+  border-color: var(--nx-accent-active);
+}
+.nx-page .fh-btn-danger {
+  background: var(--nx-bg-card);
+  border-color: var(--nx-danger-border);
+  color: var(--nx-danger);
+}
+.nx-page .fh-btn-danger:hover:not(:disabled) {
+  background: var(--nx-danger-bg);
+  border-color: var(--nx-danger);
+  color: var(--nx-danger);
+}
+.nx-page .fh-btn-small {
+  padding: 4px 10px;
+  font-size: var(--nx-font-size-sm);
+}
+.nx-page .fh-btn-mini {
+  padding: 2px 8px;
+  font-size: var(--nx-font-size-xs);
+}
+/* 负责人徽章（分区/对象认领——页头页身共用） */
+.nx-page .fh-owner {
+  border-radius: var(--nx-radius-badge);
+  border-color: var(--nx-info-border);
+  background: var(--nx-info-bg);
+  color: var(--nx-info);
+}
+.nx-page .fh-owner.is-unclaimed {
+  border-color: var(--nx-line-strong);
+  border-style: dashed;
+  background: transparent;
+  color: var(--nx-text-tertiary);
+}
+/* 多人协作提示条（页头/设置页/模型页通用 warning 刻面） */
+.nx-page .fh-collab-tip {
+  color: var(--nx-warning);
+  background: var(--nx-warning-bg);
+  border-color: var(--nx-warning-border);
+  border-radius: var(--nx-radius-input);
+}
+
+/* 表单钩子 → nx-input 视觉 */
+.nx-page .fh-select,
+.nx-page .fh-input,
+.nx-page .fh-field input,
+.nx-page .fh-field textarea,
+.nx-page .fh-field select {
+  border: 1px solid var(--nx-line-strong);
+  border-radius: var(--nx-radius-input);
+  background: var(--nx-bg-card);
+  color: var(--nx-text-primary);
+  font-size: var(--nx-font-size-sm);
+  padding: 6px 10px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.nx-page .fh-input:focus-visible,
+.nx-page .fh-select:focus-visible,
+.nx-page .fh-field input:focus-visible,
+.nx-page .fh-field textarea:focus-visible {
+  outline: none;
+  border-color: var(--nx-accent);
+  box-shadow: 0 0 0 3px var(--nx-ring-color);
+}
+.nx-page .fh-field-label {
+  color: var(--nx-text-tertiary);
+  font-weight: var(--nx-font-weight-medium);
+}
+
+/* 消息条/空态/文字钩子 */
+.nx-page .fh-error-box {
+  background: var(--nx-danger-bg);
+  border-color: var(--nx-danger-border);
+  color: var(--nx-danger);
+  border-radius: var(--nx-radius-input);
+  font-size: var(--nx-font-size-sm);
+}
+.nx-page .fh-warn-box {
+  background: var(--nx-warning-bg);
+  border-color: var(--nx-warning-border);
+  color: var(--nx-warning);
+  border-radius: var(--nx-radius-input);
+  font-size: var(--nx-font-size-sm);
+}
+.nx-page .fh-empty {
+  border: 1px dashed var(--nx-line-strong);
+  border-radius: var(--nx-radius-card);
+  background: var(--nx-bg-subtle);
+  color: var(--nx-text-tertiary);
+  font-size: var(--nx-font-size-sm);
+}
+.nx-page .fh-muted {
+  color: var(--nx-text-tertiary);
+}
+.nx-page .fh-small {
+  font-size: var(--nx-font-size-xs);
+}
+.nx-page .fh-pre-box {
+  border: 1px solid var(--nx-line-divider);
+  border-radius: var(--nx-radius-input);
+  background: var(--nx-bg-subtle);
+}
+.nx-page .fh-pre {
+  color: var(--nx-text-primary);
+  font-size: var(--nx-font-size-sm);
+  line-height: 1.7;
+}
+.nx-page .fh-spin {
+  font-size: inherit;
+}
+
+/* =============================================================================
+   试点页一：FilmHub 大厅（HubLobby）——hub-* 钩子全量重皮
+   （flow.css 原 lobby 规则块已删，本区为唯一事实源；hub-tree 系 / hub-view 系
+    等 HubBrowse 专用类在下方第二批区，不在本区）
+   ============================================================================= */
+
+.hub-lobby {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--nx-bg-body);
+  border-radius: var(--nx-radius-card);
+  padding: 16px;
+}
+.hub-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.hub-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+/* 品牌标：点睛蓝渐变方标 + 内嵌胶片图标（NxThemeToggle 同款几何） */
+.hub-brand-icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--nx-accent) 0%, var(--nx-accent-hover) 100%);
+  color: var(--nx-text-inverse);
+  box-shadow: var(--nx-shadow-md);
+}
+.hub-brand-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.hub-brand-name {
+  font-size: var(--nx-font-size-md);
+  font-weight: var(--nx-font-weight-semibold);
+  color: var(--nx-text-primary);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.hub-brand-sub {
+  font-size: var(--nx-font-size-xs);
+  color: var(--nx-text-tertiary);
+}
+.hub-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.hub-search {
+  font-family: inherit;
+  font-size: var(--nx-font-size-sm);
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--nx-line-strong);
+  border-radius: var(--nx-radius-pill);
+  background: var(--nx-bg-card);
+  color: var(--nx-text-primary);
+  min-width: 220px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.hub-search::placeholder {
+  color: var(--nx-text-tertiary);
+}
+.hub-search:focus-visible {
+  outline: none;
+  border-color: var(--nx-accent);
+  box-shadow: 0 0 0 3px var(--nx-ring-color);
+}
+/* 丰富模式开关：中性 chip；开启态 success 浅底 */
+.hub-rich-toggle {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--nx-line-strong);
+  border-radius: var(--nx-radius-input);
+  background: var(--nx-bg-card);
+  color: var(--nx-text-tertiary);
+  font-family: inherit;
+  font-size: var(--nx-font-size-xs);
+  font-weight: var(--nx-font-weight-medium);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.hub-rich-toggle:hover:not(:disabled) {
+  background: var(--nx-bg-hover);
+  color: var(--nx-text-secondary);
+}
+.hub-rich-toggle:active:not(:disabled) {
+  background: var(--nx-bg-burn);
+}
+.hub-rich-toggle.is-on {
+  background: var(--nx-success-bg);
+  border-color: var(--nx-success-border);
+  color: var(--nx-success);
+}
+.hub-rich-toggle:focus-visible {
+  outline: 2px solid var(--nx-ring-color);
+  outline-offset: var(--nx-ring-offset);
+}
+.hub-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* 列表头：计数 + 内嵌筛选下拉（类别/阶段收进来） */
+.hub-listhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.hub-count {
+  font-size: var(--nx-font-size-xs);
+  color: var(--nx-text-tertiary);
+  flex-shrink: 0;
+}
+.hub-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+/* 筛选触发钮（NxPopover trigger 内的 nx-btn 复用；选中非「全部」时 accent 态） */
+.hub-filter-btn.is-filtered {
+  border-color: var(--nx-accent-border);
+  background: var(--nx-accent-soft);
+  color: var(--nx-accent);
+}
+.hub-filter-menu {
+  min-width: 168px;
+}
+.hub-filter-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--nx-radius-input);
+  background: transparent;
+  color: var(--nx-text-secondary);
+  font-family: inherit;
+  font-size: var(--nx-font-size-sm);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.hub-filter-opt:hover {
+  background: var(--nx-bg-hover);
+  color: var(--nx-text-primary);
+}
+.hub-filter-opt.is-on {
+  background: var(--nx-accent-soft);
+  color: var(--nx-accent);
+  font-weight: var(--nx-font-weight-semibold);
+}
+.hub-filter-opt:focus-visible {
+  outline: 2px solid var(--nx-ring-color);
+  outline-offset: -2px;
+}
+.hub-filter-opt__mark {
+  width: 14px;
+  flex-shrink: 0;
+  color: var(--nx-accent);
+}
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  gap: 14px;
+}
+/* 项目卡（nx-card is-interactive 三态视觉在基座区；此处为卡内排版） */
+.hub-card {
+  padding: 16px;
+  gap: 10px;
+  cursor: pointer;
+}
+.hub-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.hub-card-title {
+  font-size: var(--nx-font-size-base);
+  font-weight: var(--nx-font-weight-semibold);
+  color: var(--nx-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.hub-pill-ratio {
+  font-family: var(--nx-font-mono);
+  font-size: var(--nx-font-size-xs);
+  padding: 1px 8px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--nx-radius-badge);
+  border: 1px solid var(--nx-line-regular);
+  background: var(--nx-bg-hover);
+  color: var(--nx-text-tertiary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.hub-idea {
+  margin: 0;
+  font-size: var(--nx-font-size-sm);
+  line-height: 1.55;
+  color: var(--nx-text-tertiary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.9em;
+}
+/* 五阶段进度点：完成=绿描点、当前=主色实底、未到=中性空点 */
+.hub-stages {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.hub-stage-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--nx-font-size-xs);
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: var(--nx-radius-badge);
+  border: 1px solid var(--nx-line-regular);
+  color: var(--nx-text-tertiary);
+  background: var(--nx-bg-hover);
+  white-space: nowrap;
+}
+.hub-stage-dot__mark {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1.5px solid var(--nx-text-tertiary);
+  flex-shrink: 0;
+}
+.hub-stage-dot.is-done {
+  border-color: var(--nx-success-border);
+  background: var(--nx-success-bg);
+  color: var(--nx-success);
+}
+.hub-stage-dot.is-done .hub-stage-dot__mark {
+  border-color: var(--nx-success);
+  background: var(--nx-success);
+}
+.hub-stage-dot.is-current {
+  border-color: var(--nx-accent);
+  background: var(--nx-accent);
+  color: var(--nx-text-inverse);
+  font-weight: var(--nx-font-weight-semibold);
+}
+.hub-stage-dot.is-current .hub-stage-dot__mark {
+  border-color: var(--nx-text-inverse);
+  background: transparent;
+}
+/* 成员 chips：首字头像圆点 + 名字 */
+.hub-members {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.hub-member-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--nx-font-size-xs);
+  line-height: 1;
+  padding: 3px 8px 3px 3px;
+  border-radius: var(--nx-radius-pill);
+  border: 1px solid var(--nx-info-border);
+  background: var(--nx-info-bg);
+  color: var(--nx-info);
+  white-space: nowrap;
+}
+.hub-member-chip__ava {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: var(--nx-font-weight-semibold);
+  background: var(--nx-info);
+  color: var(--nx-bg-card);
+  flex-shrink: 0;
+}
+.hub-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: var(--nx-font-size-xs);
+  color: var(--nx-text-tertiary);
+}
+.hub-latest {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--nx-font-size-xs);
+  color: var(--nx-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hub-latest__arrow {
+  color: var(--nx-accent);
+  flex-shrink: 0;
+}
+.hub-actions {
+  display: flex;
+  gap: 8px;
+  border-top: 0.5px solid var(--nx-line-divider);
+  padding-top: 10px;
+  margin-top: auto;
+}
+/* 空态 / 骨架屏（加载中列表占位） */
+.hub-skeleton {
+  height: 208px;
+}
+.hub-skeleton-line {
+  height: 12px;
+  border-radius: var(--nx-radius-badge);
+  background: var(--nx-bg-hover);
+  margin: 14px 16px;
+}
+.hub-skeleton-line--w60 {
+  width: 60%;
+}
+.hub-skeleton-line--w40 {
+  width: 40%;
+}
+.hub-skeleton-line--w80 {
+  width: 80%;
+}
+@media (max-width: 880px) {
+  .hub-lobby {
+    padding: 12px;
+  }
+}
+
+/* =============================================================================
+   试点页二：剧情页管线进度（StoryPage）——story-* 钩子全量重皮
+   ============================================================================= */
+
+/* emb 不可用提示行：warning 浅底刻面 + 可关闭 */
+.story-emb-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--nx-warning-border);
+  border-radius: var(--nx-radius-input);
+  background: var(--nx-warning-bg);
+  color: var(--nx-warning);
+  font-size: var(--nx-font-size-sm);
+}
+.story-emb-hint-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.5;
+  word-break: break-all;
+}
+.story-emb-hint .nx-btn--ghost {
+  color: var(--nx-warning);
+}
+
+/* 源行：管线聚合徽章 + 任务 popover 触发 */
+.story-src-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+}
+.story-src-bytes {
+  font-family: var(--nx-font-mono);
+  font-size: var(--nx-font-size-xs);
+  color: var(--nx-text-tertiary);
+  flex-shrink: 0;
+}
+.story-src-fileicon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--nx-text-tertiary);
+}
+/* 失败行：行内重试钮（destructive ghost 尺寸） */
+.story-retry {
+  flex-shrink: 0;
+}
+/* 管线任务 popover：每任务一行（阶段词 + 状态 + X/Y 计数 + 进度条） */
+.story-pipe-pop {
+  min-width: 264px;
+}
+.story-pipe-task {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  border: 0.5px solid var(--nx-line-divider);
+  border-radius: var(--nx-radius-input);
+  background: var(--nx-bg-subtle);
+}
+.story-pipe-task__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.story-pipe-task__stage {
+  font-size: var(--nx-font-size-sm);
+  font-weight: var(--nx-font-weight-semibold);
+  color: var(--nx-text-primary);
+  flex-shrink: 0;
+}
+.story-pipe-task__meta {
+  margin-left: auto;
+  font-size: var(--nx-font-size-xs);
+  color: var(--nx-text-tertiary);
+  font-family: var(--nx-font-mono);
+  flex-shrink: 0;
+}
+.story-pipe-task__err {
+  font-size: var(--nx-font-size-xs);
+  color: var(--nx-danger);
+  word-break: break-all;
+  line-height: 1.45;
+}
+/* 语义搜索结果块卡 */
+.story-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 16px 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.story-search-hit {
+  border: 0.5px solid var(--nx-line-regular);
+  border-radius: var(--nx-radius-input);
+  padding: 8px 10px;
+  cursor: pointer;
+  background: var(--nx-bg-card);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.story-search-hit:hover {
+  border-color: var(--nx-accent-border);
+  background: var(--nx-accent-soft);
+  box-shadow: var(--nx-shadow-xs);
+}
+.story-search-hit:focus-visible {
+  outline: 2px solid var(--nx-ring-color);
+  outline-offset: 1px;
+}
+.story-search-text {
+  font-size: var(--nx-font-size-xs);
+  line-height: 1.55;
+  color: var(--nx-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* 人物档案卡 */
+.story-profile-card {
+  border: 0.5px solid var(--nx-line-regular);
+  border-radius: var(--nx-radius-input);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--nx-bg-card);
+}
+.story-profile-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.story-profile-name {
+  font-weight: var(--nx-font-weight-semibold);
+  font-size: var(--nx-font-size-base);
+  color: var(--nx-text-primary);
+}
+.story-profile-line {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* =============================================================================
+   第二批·SideNav（工作室左导航）：卡片 nx 化 + 选项卡行三态
+   （选中 = accent 左缘条 + soft 底 + accent 字；hover 换底；focus 焦点环）
+   ============================================================================= */
+.nx-page .fh-nav {
+  background: var(--nx-bg-card);
+  border: 0.5px solid var(--nx-line-regular);
+  border-radius: var(--nx-radius-card);
+  box-shadow: var(--nx-shadow-xs);
+}
+.nx-page .fh-nav-toggle {
+  color: var(--nx-text-tertiary);
+  border-radius: var(--nx-radius-input);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.nx-page .fh-nav-toggle:hover {
+  background: var(--nx-bg-hover);
+  color: var(--nx-text-primary);
+}
+.nx-page .fh-nav-toggle:focus-visible {
+  outline: 2px solid var(--nx-ring-color);
+  outline-offset: var(--nx-ring-offset);
+}
+.nx-page .fh-nav-item {
+  position: relative; /* 选中态左缘条锚点 */
+  color: var(--nx-text-secondary);
+  font-size: var(--nx-font-size-sm);
+  border-radius: var(--nx-radius-input);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.nx-page .fh-nav-item:hover {
+  background: var(--nx-bg-hover);
+  color: var(--nx-text-primary);
+}
+.nx-page .fh-nav-item.is-active {
+  background: var(--nx-accent-soft);
+  color: var(--nx-accent);
+  font-weight: var(--nx-font-weight-semibold);
+}
+/* 选中左缘条：3px accent 圆头竖条（行内上下留 6px 呼吸） */
+.nx-page .fh-nav-item.is-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: var(--nx-radius-pill);
+  background: var(--nx-accent);
+}
+.nx-page .fh-nav-item:focus-visible {
+  outline: 2px solid var(--nx-ring-color);
+  outline-offset: -2px;
+}
+/* 🎬 FilmHub 品牌项（回大厅）：accent 虚线描边档 */
+.nx-page .fh-nav-home {
+  color: var(--nx-accent);
+  font-weight: var(--nx-font-weight-semibold);
+  border: 1px dashed var(--nx-accent-border);
+}
+.nx-page .fh-nav-home:hover {
+  background: var(--nx-accent-soft);
+  color: var(--nx-accent);
+}
+/* 完成态徽章：neutral 刻面 / done = success 浅底 */
+.nx-page .fh-nav-badge {
+  border-radius: var(--nx-radius-badge);
+  border: 1px solid var(--nx-line-regular);
+  background: var(--nx-bg-hover);
+  color: var(--nx-text-tertiary);
+  font-size: var(--nx-font-size-xs);
+}
+.nx-page .fh-nav-badge.is-done {
+  border-color: var(--nx-success-border);
+  background: var(--nx-success-bg);
+  color: var(--nx-success);
+}
+.nx-page .fh-nav-sep {
+  background: var(--nx-line-divider);
+}
+/* 行尾 ⧉ 外链钮（hover 显形） */
+.nx-page .fh-nav-ext {
+  color: var(--nx-text-tertiary);
+  border-radius: 4px;
+  transition:
+    opacity 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.nx-page .fh-nav-ext:hover {
+  background: var(--nx-bg-burn);
+  color: var(--nx-accent);
+}
+.nx-page .fh-nav-ext:focus-visible {
+  outline: 2px solid var(--nx-ring-color);
+  outline-offset: 1px;
+}
+
+/* =============================================================================
+   第二批·HubTreeCard（SideNav 底部紧凑树卡 / HubBrowse 左栏共用）
+   ============================================================================= */
+.nx-page .hub-tree-card {
+  background: var(--nx-bg-card);
+  border: 0.5px solid var(--nx-line-regular);
+  border-radius: var(--nx-radius-input);
+  box-shadow: none; /* 左栏内嵌面：不与外卡叠阴影 */
+}
+.nx-page .hub-tree-card .hub-tree-head {
+  color: var(--nx-text-primary);
+  font-size: var(--nx-font-size-xs);
+  font-weight: var(--nx-font-weight-semibold);
+  border-bottom: 0.5px solid var(--nx-line-divider);
+}
+.nx-page .hub-tree-card-toggle {
+  color: var(--nx-text-tertiary);
+}
+.nx-page .hub-tree-card-toggle:hover {
+  color: var(--nx-text-primary);
+}
+.nx-page .hub-tree-card-toggle:focus-visible {
+  outline: 2px solid var(--nx-ring-color);
+  outline-offset: 1px;
+}
+.nx-page .hub-tree-card-title {
+  font-weight: var(--nx-font-weight-semibold);
+  color: var(--nx-text-primary);
+}
+.nx-page .hub-tree-browse {
+  color: var(--nx-accent);
+  font-size: var(--nx-font-size-xs);
+  border-bottom: 1px dashed var(--nx-line-divider);
+  transition: background 0.12s ease;
+}
+.nx-page .hub-tree-browse:hover {
+  background: var(--nx-accent-soft);
+}
+.nx-page .hub-tree-browse:focus-visible {
+  outline: 2px solid var(--nx-ring-color);
+  outline-offset: -2px;
+}
+/* 树行：hover 换底 / 选中 accent soft+字色；focus 焦点环 */
+.nx-page .hub-tree-row {
+  color: var(--nx-text-secondary);
+  font-size: var(--nx-font-size-xs);
+  border-radius: var(--nx-radius-input);
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.nx-page .hub-tree-row:hover {
+  background: var(--nx-bg-hover);
+  color: var(--nx-text-primary);
+}
+.nx-page .hub-tree-row.is-selected {
+  background: var(--nx-accent-soft);
+  color: var(--nx-accent);
+  font-weight: var(--nx-font-weight-semibold);
+}
+.nx-page .hub-tree-row:focus-visible {
+  outline: 2px solid var(--nx-ring-color);
+  outline-offset: -2px;
+}
+.nx-page .hub-tree-caret {
+  color: var(--nx-text-tertiary);
+}
+.nx-page .hub-tree-bytes {
+  color: var(--nx-text-tertiary);
+  font-family: var(--nx-font-mono);
+}
+/* ⤢ 大展开钮：展开态 success 浅底 */
+.nx-page .hub-tree-expand.is-on {
+  border-color: var(--nx-success-border);
+  background: var(--nx-success-bg);
+  color: var(--nx-success);
+}
+/* 展开态下区内容预览：subtle 底内衬 + divider 描边 */
+.nx-page .hub-tree-preview {
+  border-top: 0.5px solid var(--nx-line-divider);
+}
+.nx-page .hub-tree-preview-title {
+  color: var(--nx-text-tertiary);
+  font-family: var(--nx-font-mono);
+}
+.nx-page .hub-tree-preview-body {
+  border: 0.5px solid var(--nx-line-divider);
+  border-radius: var(--nx-radius-input);
+  background: var(--nx-bg-subtle);
+}
+.nx-page .hub-tree-preview-img {
+  border-radius: var(--nx-radius-input);
+}
+.nx-page .hub-tree-card .fh-empty {
+  border-radius: var(--nx-radius-input);
+}
+
+/* =============================================================================
+   第二批·HubBrowse（文件树左栏 + 内容区 + 接入指南）
+   ============================================================================= */
+.nx-page .hub-tree {
+  background: var(--nx-bg-card);
+  border: 0.5px solid var(--nx-line-regular);
+  border-radius: var(--nx-radius-card);
+  box-shadow: var(--nx-shadow-xs);
+}
+/* HubBrowse 左栏形态：树卡嵌在 .hub-tree 卡内——内层卡面拍平（防双描边） */
+.nx-page .hub-tree .hub-tree-card {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+.nx-page .hub-tree-head {
+  color: var(--nx-text-primary);
+  font-size: var(--nx-font-size-sm);
+  font-weight: var(--nx-font-weight-semibold);
+  border-bottom: 0.5px solid var(--nx-line-divider);
+}
+.nx-page .hub-crumbs {
+  color: var(--nx-text-secondary);
+  font-family: var(--nx-font-mono);
+  font-size: var(--nx-font-size-xs);
+}
+.nx-page .hub-crumb-seg {
+  color: var(--nx-text-primary);
+  font-weight: var(--nx-font-weight-medium);
+}
+.nx-page .hub-view-body {
+  border: 0.5px solid var(--nx-line-divider);
+  border-radius: var(--nx-radius-card);
+  background: var(--nx-bg-subtle);
+}
+.nx-page .hub-media-img {
+  border: 0.5px solid var(--nx-line-regular);
+  border-radius: var(--nx-radius-input);
+  background: var(--nx-bg-card);
+}
+.nx-page .hub-guide-block {
+  background: var(--nx-bg-card);
+  border: 0.5px solid var(--nx-line-regular);
+  border-radius: var(--nx-radius-card);
+  box-shadow: var(--nx-shadow-xs);
+}
+.nx-page .hub-guide-title {
+  color: var(--nx-text-primary);
+  font-size: var(--nx-font-size-sm);
+  font-weight: var(--nx-font-weight-semibold);
+}
+.nx-page .hub-curl {
+  color: var(--nx-text-primary);
+  background: var(--nx-bg-subtle);
+  border: 0.5px solid var(--nx-line-divider);
+  border-radius: var(--nx-radius-input);
+  font-family: var(--nx-font-mono);
+  font-size: var(--nx-font-size-xs);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* =============================================================================
+   第二批·缩略图 / 视图槽位（定妆对象卡视图横排 + 定制器「更多视图」）
+   ============================================================================= */
+.nx-page .fh-thumb {
+  border: 0.5px solid var(--nx-line-regular);
+  border-radius: var(--nx-radius-input);
+  background: var(--nx-bg-subtle);
+}
+.nx-page .fh-view-slot {
+  border: 1px dashed var(--nx-line-strong);
+  border-radius: var(--nx-radius-input);
+  background: var(--nx-bg-card);
+}
+.nx-page .fh-view-slot.is-filled {
+  border-style: solid;
+  border-color: var(--nx-success-border);
+  background: var(--nx-success-bg);
+}
+.nx-page .fh-view-img {
+  border: 0.5px solid var(--nx-line-regular);
+  border-radius: var(--nx-radius-input);
+  background: var(--nx-bg-subtle);
+}
+.nx-page .fh-view-ph {
+  border-radius: var(--nx-radius-input);
+  background: var(--nx-bg-subtle);
+  color: var(--nx-text-tertiary);
+}
+.nx-page .fh-view-label {
+  color: var(--nx-text-primary);
+  font-size: var(--nx-font-size-xs);
+  font-weight: var(--nx-font-weight-medium);
+}
+
+/* =============================================================================
+   第二批·弹窗（fh-modal 三段式：backdrop / 卡体 / 头 / 关闭钮 / 钉底操作区）
+   —— CastingPage 新建、ModelsPage 配置+添加 API、CostBadge 成本面板共用
+   ============================================================================= */
+.nx-page .fh-modal-backdrop {
+  background: rgb(9 9 11 / 0.42); /* 遮罩：深浅主题同值（黑系半透明） */
+  backdrop-filter: blur(3px);
+}
+.nx-page .fh-modal {
+  background: var(--nx-bg-card);
+  border: 0.5px solid var(--nx-line-strong);
+  border-radius: var(--nx-radius-card);
+  box-shadow: var(--nx-shadow-lg);
+}
+.nx-page .fh-modal-head {
+  border-bottom: 0.5px solid var(--nx-line-divider);
+}
+.nx-page .fh-modal-head h3 {
+  font-size: var(--nx-font-size-md);
+  font-weight: var(--nx-font-weight-semibold);
+  color: var(--nx-text-primary);
+  letter-spacing: -0.01em;
+}
+.nx-page .fh-modal-close {
+  color: var(--nx-text-tertiary);
+  border-radius: var(--nx-radius-input);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.nx-page .fh-modal-close:hover {
+  background: var(--nx-bg-hover);
+  color: var(--nx-text-primary);
+}
+.nx-page .fh-modal-close:focus-visible {
+  outline: 2px solid var(--nx-ring-color);
+  outline-offset: var(--nx-ring-offset);
+}
+.nx-page .fh-form-actions {
+  background: var(--nx-bg-card);
+  border-top: 0.5px solid var(--nx-line-divider);
+}
+
+/* =============================================================================
+   第二批·模型设置页（Dify 供应商页 IA：八能力位行卡 + 可用性状态点）
+   ============================================================================= */
+.nx-page .models-row {
+  border: 0.5px solid var(--nx-line-regular);
+  border-radius: var(--nx-radius-input);
+  background: var(--nx-bg-card);
+  font-size: var(--nx-font-size-sm);
+  color: var(--nx-text-secondary);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.nx-page .models-row:hover {
+  border-color: var(--nx-line-strong);
+  background: var(--nx-bg-subtle);
+  box-shadow: var(--nx-shadow-xs);
+}
+.nx-page .models-name {
+  color: var(--nx-text-primary);
+}
+.nx-page .models-slot {
+  color: var(--nx-text-tertiary);
+}
+.nx-page .models-add-notice {
+  color: var(--nx-success);
+}
+/* 可用性状态点：灰 = line-strong 空点 / 绿 = success 实点 */
+.nx-page .models-dot {
+  background: var(--nx-line-strong);
+}
+.nx-page .models-dot.ok {
+  background: var(--nx-success);
+  box-shadow: 0 0 0 3px var(--nx-success-bg); /* 光晕底——绿点可读性 */
+}

@@ -1,0 +1,43 @@
+# os-i18n 简体中文资源（zh_cn）—— 系统通用键骨架
+#
+# 格式约定见 en.toml 顶部说明。业务键由各 crate 贡献补充。
+
+[error]
+internal = "内部错误"
+not_found = "未找到：{name}"
+permission_denied = "权限不足"
+invalid_input = "输入无效：{field}"
+disk_failed = "磁盘 {name} 故障"
+network_unreachable = "网络不可达：{host}"
+timeout = "操作超时"
+unauthorized = "未授权"
+conflict = "冲突：{name}"
+service_unavailable = "服务不可用"
+
+[common]
+ok = "确定"
+cancel = "取消"
+confirm = "确认"
+save = "保存"
+delete = "删除"
+edit = "编辑"
+create = "创建"
+retry = "重试"
+loading = "加载中..."
+yes = "是"
+no = "否"
+name = "名称"
+status = "状态"
+actions = "操作"
+description = "描述"
+
+[pool]
+created = "存储池 {name} 已创建"
+destroyed = "存储池 {name} 已销毁"
+not_found = "存储池 {name} 不存在"
+already_exists = "存储池 {name} 已存在"
+started = "存储池 {name} 已启动"
+stopped = "存储池 {name} 已停止"
+degraded = "存储池 {name} 处于降级状态"
+scrub_started = "已开始对存储池 {name} 执行校验"
+scrub_finished = "存储池 {name} 校验完成"

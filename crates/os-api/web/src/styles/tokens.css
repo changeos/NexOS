@@ -1,0 +1,68 @@
+/* ============================================================
+   OS System Web UI — 设计令牌（CSS 变量）
+   从 crates/os-api/static/css/style.css 的 :root 提取，
+   供 Vue3 新版 UI 复用 Ubuntu Yaru / GNOME Adwaita 风浅色主题设计系统。
+   设计参考：Ubuntu Yaru / GNOME Adwaita Human Interface Guidelines
+   ============================================================ */
+
+:root {
+    /* 背景层（Ubuntu Yaru 浅色主题） */
+    --bg-app: #FAFAFA;              /* Yaru 暖白背景（替代Ubuntu #f5f5f7） */
+    --bg-card: #FFFFFF;             /* 卡片白 */
+    --bg-elev: #F7F7F7;             /* 表头 / hover 行基底 */
+
+    /* 文字（Ubuntu Arrnenius 深灰系） */
+    --text: #2B2B2B;                /* Ubuntu 深灰（替代Ubuntu #1d1d1f） */
+    --text-muted: #5E5C5F;          /* 中灰（替代Ubuntu #86868b） */
+    --text-faint: #878789;          /* 占位 / 弱化 */
+
+    /* 强调色（Ubuntu Orange 取代Ubuntu 橙） */
+    --accent: #E95420;              /* Ubuntu Orange（替代Ubuntu #0071e3） */
+    --accent-hi: #F0633A;           /* hover 略亮 */
+    --accent-soft: rgba(233, 84, 32, 0.12); /* active 导航淡橙背景 */
+
+    /* 边框 / 分隔 */
+    --border: #D9D9D9;              /* Yaru 边框灰 */
+    --border-soft: #EDEDED;         /* 表格分隔线 / 表头底线 */
+    --hairline: rgba(0, 0, 0, 0.08); /* 1px 发丝线 */
+
+    /* 语义色（Yaru 色系） */
+    --ok: #0E8420;                  /* Yaru 绿（替代Ubuntu #34c759） */
+    --warn: #F99B11;                /* Yaru 黄橙（替代Ubuntu #ff9f0a） */
+    --err: #C7162B;                 /* Yaru 红（替代Ubuntu #ff3b30） */
+    --info: #335280;                /* Yaru 蓝灰 */
+
+    /* 半透明（GNOME 风，比Ubuntu毛玻璃更克制） */
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --glass-blur: blur(12px);
+
+    /* 窗口按钮（Ubuntu/GNOME 风：右上角圆形符号，非红黄绿交通灯） */
+    --win-close: #E95420;           /* 关闭 = 橙 */
+    --win-min: #5E5C5F;             /* 最小化 = 灰 */
+    --win-max: #5E5C5F;             /* 最大化 = 灰 */
+    /* 兼容旧交通灯变量名（指向新 GNOME 风配色） */
+    --tl-red: #E95420;
+    --tl-yellow: #5E5C5F;
+    --tl-green: #5E5C5F;
+
+    /* 圆角（Ubuntu 偏方正，比Ubuntu小） */
+    --radius: 10px;                 /* 卡片（替代Ubuntu 16px） */
+    --radius-md: 8px;               /* 中等（替代Ubuntu 12px） */
+    --radius-sm: 6px;               /* 按钮（替代Ubuntu 8px） */
+    --radius-pill: 16px;            /* 药丸（替代Ubuntu 20px） */
+
+    /* 阴影（Ubuntu 偏扁平，比Ubuntu轻） */
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+    --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.12);
+    --shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.20), 0 2px 8px rgba(0, 0, 0, 0.08);
+
+    /* 尺寸 */
+    --nav-w: 240px;
+    --topbar-h: 48px;               /* GNOME 顶栏偏矮（替代Ubuntu 52px） */
+
+    /* 字体栈：Ubuntu 优先（替代苹果 SF Pro） */
+    --font: "Ubuntu", "Ubuntu Mono", -apple-system, BlinkMacSystemFont, "Segoe UI",
+            "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    --mono: "Ubuntu Mono", "SF Mono", ui-monospace, Menlo, Consolas,
+            "Liberation Mono", monospace;
+}

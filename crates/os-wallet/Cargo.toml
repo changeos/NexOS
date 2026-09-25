@@ -1,0 +1,50 @@
+[package]
+name = "os-wallet"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 多链钱包与签名中枢：钱包连接(WalletConnect) + 多链适配(BTC/EVM) + RPC 条件激活（契约层）"
+
+[features]
+# 提供 MockWalletConnector / MockChainAdapter / MockRpcRegistry，供下游
+# agent（guest-agent / im-agent）单元测/集成测注入（见 _conventions.md §5）。
+# 用法：`os-wallet = { workspace = true, features = ["mock"] }`（仅 [dev-dependencies]）。
+default = []
+mock = []
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+# HTTP 客户端：RpcRegistryImpl 真实 RPC 探活（EVM eth_blockNumber / BTC getblockchaininfo）。
+# rustls-tls（workspace 默认），避免 openssl 系统依赖（见 ADR-DEPS-001）。
+reqwest.workspace = true
+# 真实密码学依赖（ADR-DEPS-002，P2 wallet-agent 接通真实验签）：
+# - bitcoin：BTC BIP-322 / Schnorr / ECDSA 验签 + 地址解析（rust-bitcoin 0.32 稳定线）。
+#   默认 feature 已含 `secp-recovery`（公钥恢复用）。
+# - alloy：EVM EIP-191 / EIP-712 验签（recover 地址比对）+ eth_call 余额/凭证查询
+#   （alloy 2.x 全栈，默认 feature 含 signer-local/primitives/dyn-abi/providers/http）。
+#   额外启用 `eip712`（TypedData 解析 + eip712_signing_hash）。
+# - secp256k1：BTC/EVM 共享 secp256k1 曲线（与 bitcoin 同生态，0.31 稳定主线）。
+#   启用 `recovery`（recoverable ECDSA）+ `hashes`（sha256/sha256d）。
+#   注：BTC 验签代码经 `bitcoin::secp256k1`（0.29）+ `bitcoin::hashes` 访问，与 bitcoin
+#   crate 锁定同一 secp256k1 次版本；独立 secp256k1 0.31 仅作 workspace 注册项保留。
+bitcoin = { workspace = true }
+alloy = { workspace = true, features = ["eip712"] }
+secp256k1 = { workspace = true, features = ["recovery", "hashes"] }
+# base64：BIP-322 签名为 base64 编码（simple=base64(witness stack)，
+# legacy=base64(recoverable ECDSA)）。workspace 已注册 base64 0.22（ADR-DEPS-001）。
+base64 = { workspace = true }
+os-core.workspace = true
+os-common.workspace = true
+os-security.workspace = true
+
+[dev-dependencies]
+# 测试期启用本 crate 的 mock feature，方便内部单测直接复用 MockXxx。
+os-wallet = { workspace = true, features = ["mock"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
