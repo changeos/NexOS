@@ -1,0 +1,38 @@
+[package]
+name = "os-nexhub"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "NexHub：代码仓库中心（原生 git 裸仓库管理）+ 大厅发现层（发布/克隆/统计）——从 os-api 抽离的独立 RouteHandler crate（见 docs/COMPONENT_INDEPENDENCE_AUDIT.md §6）"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+# now_iso（会话/发布时间戳，RFC3339 本地时区）。
+chrono.workspace = true
+# git 子进程（tokio::process::Command）+ spawn_blocking 扫描 + 克隆 10s 超时 +
+# 测试 #[tokio::test]（workspace tokio 已含 macros/rt-multi-thread/process/time）。
+tokio.workspace = true
+# RouteHandler 契约（os-common::gateway，dyn 兼容 async trait）。
+async-trait.workspace = true
+# 大厅 hub_lobby 发布索引持久化（WAL 文件库，bundled 内嵌 sqlite3）。
+rusqlite.workspace = true
+# 网关契约（HttpMethod/RouteSpec/ApiRequest/ApiResponse/HandlerError/RouteHandler）
+# + 链上身份认证内核（ChainAuth：挑战-签名 nonce/token 桶 + k256 验签 + EVM
+# 展示名派生，设计 docs/MEDIA_GEN_AND_CHAIN_AUTH.md §C）。
+os-common.workspace = true
+# 链上认证 verify 端点的签名解码（65 字节 r||s||v hex）。
+hex.workspace = true
+# chain_verify：EVM JSON-RPC over HTTP（rustls 栈，与 os-api blockchain.rs 同款用法）。
+reqwest.workspace = true
+# chain_verify：进程级共享 reqwest::Client 的 Lazy 静态初始化
+# （workspace MSRV 1.75 < std::sync::LazyLock 1.80，见根 Cargo.toml 注释）。
+once_cell.workspace = true
+
+[dev-dependencies]
+# 链上认证测试：真密钥对生成/签名（k256 SigningKey + SHA-256 摘要，与
+# os-common chain_auth / os-api im.rs 测试同栈同构）。
+k256.workspace = true
+sha2.workspace = true

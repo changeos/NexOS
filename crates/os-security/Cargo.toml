@@ -1,0 +1,76 @@
+[package]
+name = "os-security"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 系统安全增强：用户认证/JWT/证书(CA+ACME)/2FA/VPN(WireGuard)（接口契约，见规划文档 §3.16）"
+
+[dependencies]
+# async-trait：JwtIssuer 经 Box<dyn JwtIssuer> 运行期注入（os-guest
+# DefaultChainOrchestrator 注入点；ADR-COMPAT-001）。
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+tokio.workspace = true
+os-core.workspace = true
+os-common.workspace = true
+os-network.workspace = true
+# 真实安全原语（ADR-DEPS-001 注册，security-agent 批 2 接通）
+argon2.workspace = true
+jsonwebtoken.workspace = true
+# TOTP 需要 HMAC-SHA1（RFC 6238 标准；workspace 未单独注册 hmac/sha1，
+# 按 ADR-DEPS-001 「按需引用」原则在本 crate 直接引入，纯 RustCrypto 实现）。
+# 注：sha2（已注册）暂未在 os-security 使用——TOTP 用 SHA1，证书/包校验由
+# 其他 crate 负责；保留按需引入原则，不加未用依赖。
+hmac = "0.12"
+sha1 = "0.10"
+# 密码学安全随机源（argon2 salt + 2FA secret 生成）。rand 0.8 对应
+# password-hash 0.5 / rand_core 0.6，提供 OsRng。
+rand = "0.8"
+# 真实 CA 证书签发（批 3 接通，ADR-DEPS-002 注册）。rcgen 默认 feature
+# = crypto + pem + ring；额外开 x509-parser 以解析 CSR 输入（sign 接口）。
+rcgen = { workspace = true, features = ["pem", "x509-parser"] }
+# rcgen 传递依赖，按需直接引入（用于 cert DER 解析与有效期/序列号提取、
+# 以及 OffsetDateTime 有效期设置）：
+# - x509-parser：解析已签发证书 DER（提取 not_before/not_after/serial/issuer/subject）。
+# - time：rcgen CertificateParams.not_before/not_after 用 time::OffsetDateTime。
+# - rustls-pki-types：CertificateSigningRequestDer 类型（rcgen 未 re-export）。
+x509-parser = "0.18"
+time = "0.3"
+rustls-pki-types = { version = "1", package = "rustls-pki-types" }
+# 真实 WireGuard VPN（批 3 接通，ADR-DEPS-002 注册）。仅用默认 feature
+# （noise 协议模块 + x25519 密钥），**不开 device**（避免 socket2/TUN 依赖，
+# 与「不真建隧道」红线一致——测试用 fixture 跑 noise 协议层）。
+boringtun = { workspace = true }
+# base64：WireGuard 公钥/私钥的标准编码（RFC 7748 §5）。
+base64 = "0.22"
+# 真实 ACME 客户端（批 4 接通，ADR-DEPS-004 注册）。`CaCertManager::acme_request`
+# 用 instant-acme 走 RFC 8555 流程（order → challenge → finalize → download）。
+# feature：`hyper-rustls`（默认 HTTP 客户端，rustls 后端）+ `rcgen`（Order::finalize
+# 内部用 rcgen 生成 CSR——与本 crate 已依赖的 rcgen 共栈）+ `ring`（crypto 后端，
+# 与 workspace rustls/discover/protocols 一致）。不开 aws-lc-rs（需 C+nasm）。
+# 测试用 in-memory fixture（实现 HttpClient trait）模拟 ACME 服务器，不真发 LE。
+instant-acme = { workspace = true }
+# http / bytes：instant-acme 的 `HttpClient` trait 签名直接用这两个 crate 的类型
+# （`http::Request<BodyWrapper<Bytes>>` / `Bytes`）。instant-acme 未 re-export，
+# 故本 crate 显式引用（与 ADR-DEPS-001 「按需直接引入」原则一致；workspace 已注册）。
+http.workspace = true
+bytes.workspace = true
+
+[dev-dependencies]
+# futures：测试 fixture 读 http body 用 `pin!` + `poll_frame`（noop_waker）。
+futures.workspace = true
+# http-body-util：测试 fixture 用 `BodyWrapper<Bytes>`（impl http_body::Body）
+# 构造 fixture 响应 + `collect` 读请求 body。
+http-body-util = "0.1"
+
+[features]
+default = []
+# Mock 实现，供下游 agent（wallet/guest/im/api）测试用。
+# 编译：`cargo build -p os-security --features mock`。
+mock = []

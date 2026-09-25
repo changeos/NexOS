@@ -1,0 +1,50 @@
+# os-i18n 英文资源（en）—— 系统通用键骨架
+#
+# 格式约定（os-i18n 自带的极简解析器仅支持以下子集，避免引入 toml 依赖）：
+#   - 行注释以 `#` 开头
+#   - 节头：`[section]`
+#   - 键值：`key = "value"`（value 必须是双引号字符串）
+#   - key 全名 = section + "." + key（如 `pool.created`）
+#   - 占位符使用 ICU 风格 `{name}`
+#
+# 业务键由各 crate 贡献补充；本文件仅含系统级通用键。
+
+[error]
+internal = "Internal error"
+not_found = "Not found: {name}"
+permission_denied = "Permission denied"
+invalid_input = "Invalid input: {field}"
+disk_failed = "Disk {name} failed"
+network_unreachable = "Network unreachable: {host}"
+timeout = "Operation timed out"
+unauthorized = "Unauthorized"
+conflict = "Conflict: {name}"
+service_unavailable = "Service unavailable"
+
+[common]
+ok = "OK"
+cancel = "Cancel"
+confirm = "Confirm"
+save = "Save"
+delete = "Delete"
+edit = "Edit"
+create = "Create"
+retry = "Retry"
+loading = "Loading..."
+yes = "Yes"
+no = "No"
+name = "Name"
+status = "Status"
+actions = "Actions"
+description = "Description"
+
+[pool]
+created = "Pool {name} created"
+destroyed = "Pool {name} destroyed"
+not_found = "Pool {name} not found"
+already_exists = "Pool {name} already exists"
+started = "Pool {name} started"
+stopped = "Pool {name} stopped"
+degraded = "Pool {name} is degraded"
+scrub_started = "Scrub started on pool {name}"
+scrub_finished = "Scrub finished on pool {name}"

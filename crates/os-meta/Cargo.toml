@@ -1,0 +1,59 @@
+[package]
+name = "os-meta"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 系统集群控制面：HA 共识/选主/分布式 KV/故障转移/VIP + 元数据 HA 复制（openraft，见规划文档 §3.5 / §9.1#7）"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+bytes.workspace = true
+tokio.workspace = true
+os-core.workspace = true
+os-common.workspace = true
+os-network.workspace = true
+# ADR-COMPAT-001：5 个 async trait（Consensus/DistributedKv/MetaStore/
+# FailoverOrchestrator/VipManager）均经 `Box<dyn>` 运行期多态（见 mock.rs
+# `_assert_dyn_compatible`），故按 ADR 一律加 `#[async_trait]` 恢复对象安全。
+async-trait.workspace = true
+# 注：VmId 等领域 ID 来自 os-core::ids，trait 层无需依赖 os-compute；
+# 迁移 VM 的实际执行在实现层由 osd 注入 VmManager 句柄。
+
+# 真实后端依赖（ADR-DEPS-002）：
+# - openraft：HA 共识（替代 InMemoryMetaState 骨架里的纯算法 Raft 模拟）
+# - rusqlite：MetaStore 内嵌 SQLite（apply_log 持久化 + snapshot/restore 用 dump）
+#
+# openraft feature：
+#   - `serde`：类型派生 Serialize/Deserialize（RaftTypeConfig 的 AppData/AppDataResponse
+#     需 OptionalSerde，开启 serde 后才要求我们的请求/响应类型可 serde——我们已派生）
+#   - `storage-v2`：启用 RaftLogStorage / RaftStateMachine（0.9 主线存储 trait，
+#     `Sealed` impl 仅在该 feature 下展开，否则无法为我们自己的 store 实现）
+#   - `single-term-leader`：用单任期 leader 模型（简化 Vote/LeaderId，适配我们的单节点场景）
+openraft = { workspace = true, features = ["serde", "storage-v2", "single-term-leader"] }
+rusqlite.workspace = true
+# rusqlite 的 Cargo feature（如 bundled）已在 workspace.dependencies 处声明，
+# 这里 `workspace = true` 会透传 bundled 配置（libsqlite3-sys 内嵌编译）。
+
+[features]
+# 默认不含 mock；下游测试启用以获得 MockConsensus / MockDistributedKv / MockMetaStore /
+# MockFailoverOrchestrator / MockVipManager（见 src/mock.rs）。
+default = []
+mock = []
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }
+# 性能基准（criterion）：micro-benchmark Raft commitIndex 推进 / 选举判定 / CAS 冲突检测。
+# workspace 已注册（dev-only）；不进入 release 产物。
+criterion.workspace = true
+
+# 性能基准：Raft 纯算法（commitIndex 推进 / 选举 quorum / 日志 up-to-date / CAS 冲突检测）。
+# criterion 默认 harness 与 [lib] test harness 互斥，需显式声明 [[bench]] 并关掉 test harness。
+[[bench]]
+name = "raft"
+path = "benches/raft.rs"
+harness = false

@@ -1,0 +1,59 @@
+/* =============================================================================
+   design/dark.css —— 运行时 token 值域·暗色主题（[data-theme="dark"] 同名换值）。
+
+   只覆盖与浅色不同的变量；变量名与 light.css 一一对应（换值不换名）。
+   暗色基底 #1d1d20 / #222225 系；文字/主色/状态色整体提亮一档保证对比度；
+   浅底变体改为同色 14% 透明度铺底（暗色下浅色底会刺眼）；阴影 alpha 加深。
+   ============================================================================= */
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* —— 背景五级 —— */
+  --nx-bg-body: #1d1d20;
+  --nx-bg-card: #222225;
+  --nx-bg-subtle: #262629;
+  --nx-bg-hover: #2a2a2e;
+  --nx-bg-burn: #35353a;
+
+  /* —— 文字四级 —— */
+  --nx-text-primary: #f2f4f7;
+  --nx-text-secondary: #c6cbd6;
+  --nx-text-tertiary: #8f96a6;
+  --nx-text-disabled: rgb(242 244 247 / 0.3);
+  --nx-text-inverse: #f5f8ff;
+
+  /* —— 主色（点睛蓝暗色提亮档） —— */
+  --nx-accent: #5b82ff;
+  --nx-accent-hover: #6f90ff;
+  --nx-accent-active: #4a72ee;
+  --nx-accent-soft: rgb(91 130 255 / 0.16);
+  --nx-accent-border: rgb(91 130 255 / 0.4);
+
+  /* —— 状态四色 —— */
+  --nx-success: #2bb673;
+  --nx-success-bg: rgb(43 182 115 / 0.14);
+  --nx-success-border: rgb(43 182 115 / 0.35);
+  --nx-warning: #f79009;
+  --nx-warning-bg: rgb(247 144 9 / 0.14);
+  --nx-warning-border: rgb(247 144 9 / 0.35);
+  --nx-info: #5b82ff;
+  --nx-info-bg: rgb(91 130 255 / 0.16);
+  --nx-info-border: rgb(91 130 255 / 0.4);
+  --nx-danger: #f67062;
+  --nx-danger-bg: rgb(246 112 98 / 0.14);
+  --nx-danger-border: rgb(246 112 98 / 0.35);
+
+  /* —— 描边 —— */
+  --nx-line-regular: #333338;
+  --nx-line-strong: #45454c;
+  --nx-line-divider: #2e2e33;
+
+  /* —— 阴影三档（暗色下加深） —— */
+  --nx-shadow-xs: 0 2px 6px rgb(0 0 0 / 0.05);
+  --nx-shadow-md: 0 2px 6px rgb(0 0 0 / 0.14);
+  --nx-shadow-lg: 0 2px 6px rgb(0 0 0 / 0.3);
+
+  /* —— 焦点环 —— */
+  --nx-ring-color: rgb(91 130 255 / 0.45);
+}

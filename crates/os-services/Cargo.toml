@@ -1,0 +1,115 @@
+[package]
+name = "os-services"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 功能服务层：备份/监控/媒体/文件/运维/电源 六组件（见规划文档 §3.16）（契约+骨架）"
+
+[features]
+default = []
+# mock feature：暴露各组件 Mock（MockPowerManager/MockFileManager/MockDevTools/
+# MockBackupManager/MockMediaManager/MockMonitor）供下游 api/client-agent 测试注入。
+# 用法：[dev-dependencies] os-services = { workspace = true, features = ["mock"] }
+mock = []
+# clip-cuda feature：启用 candle-core/nn/transformers 的 cuda feature（RTX 3090 GPU 推理）。
+# ADR-DEPS-005 真实接通：开启后 CandleClipModel 走 candle CUDA 后端（cudarc + CUDA kernel）；
+# 不开启则走 CPU 后端（candle-core 纯 Rust 实现）。与 `mock` 正交；CI/无 GPU 环境不启用。
+# 用法：cargo test -p os-services --features mock,clip-cuda -- --ignored --nocapture clip
+clip-cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
+# git-remote feature：接通 gix 远端 git clone（ADR-DEPS-002 默认 feature 之外的网络栈）。
+# 开启后 trigger_pipeline / clone_repo 对 http(s)/远端仓库执行真实 clone（gix
+# blocking-network-client + reqwest/rust-tls HTTP 传输）。不开启则远端路径保持
+# `remote://<url>` 占位（不触网），默认构建不受影响。
+# 选 reqwest-rust-tls 后端：纯 Rust TLS（rustls + webpki-roots），不引 OpenSSL，与
+# 本 crate 已有 rustls/ring 后端对齐（OS 可移植性）。与 `mock` 正交。
+# 用法：cargo test -p os-services --features mock,git-remote -- --ignored --nocapture git_remote_real
+git-remote = ["gix/blocking-network-client", "gix/blocking-http-transport-reqwest-rust-tls"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+tokio.workspace = true
+# 异步 trait（runtime 多态：FFmpeg 转码执行器 / CLIP 推理后端经 Box<dyn> 注入）。
+# 规则见根 Cargo.toml（凡 Box<dyn XxxTrait> 用 async_trait）。media-agent 编排骨架使用。
+async-trait.workspace = true
+os-core.workspace = true
+os-common.workspace = true
+os-storage.workspace = true
+# 全文搜索引擎（ADR-DEPS-001；workspace 已注册）。
+# 共享 crate——files 组件（search_index）与 media 组件（media_search）各自接通真实索引查询。
+# 对其他组件（backup/monitor/devtools/power）无 API 影响（编译时链接 tantivy 但不暴露类型）。
+tantivy.workspace = true
+# 可观测性（ADR-DEPS-002；workspace 已注册）：opentelemetry 指标采集 +
+# opentelemetry-prometheus exporter + opentelemetry_sdk（SdkMeterProvider）+
+# prometheus（Registry/TextEncoder 用于 /metrics 端点文本编码）。
+# 仅 monitor 组件（OtelMonitor）实际 use 这些类型；对 backup/media/files/
+# devtools/power 无 API 影响（编译时链接但不暴露类型）。
+opentelemetry.workspace = true
+opentelemetry_sdk.workspace = true
+opentelemetry-prometheus.workspace = true
+prometheus.workspace = true
+# tracing 日志桥接（monitor-agent）：tracing-subscriber 提供 Layer 组合 +
+# env-filter + JSON 格式化输出。monitor 组件（OtelMonitor）的 `tail_logs` 经
+# 自定义 Layer 采集 tracing 事件 → 内存 buffer → LogEntry；`init_log_export`
+# 提供 JSON 文件导出骨架（fmt::format::Json → 文件）。tracing 是事件源头
+# （#[instrument] / tracing::info! 等宏）。
+# 仅 monitor 组件 use 这些类型；对 backup/media/files/devtools/power 无 API 影响
+# （编译时链接但不暴露类型）。
+tracing.workspace = true
+tracing-subscriber.workspace = true
+# CLIP 推理后端（ADR-DEPS-005；workspace 已注册）。media 组件（media_clip）用
+# candle 加载 CLIP 模型做图像/文本向量嵌入（替代 PlaceholderClipModel 占位）。
+# workspace 注册不带 GPU feature；CPU 后端默认可用。GPU 加速（cuda feature）通过
+# crate 级 feature flag 按需开启。
+candle-core.workspace = true
+candle-nn.workspace = true
+candle-transformers.workspace = true
+# 纯 Rust Git 实现（ADR-DEPS-002；workspace 已注册）。devtools 组件（impl_devtools）用
+# 用其接通真实 Git 仓库操作（init/commit/log/branch）；CI 流水线基于真实仓库状态。
+# `tree-editor` 是 gix 的轻量 feature（构建/编辑 tree 对象），不在默认 feature 中，
+# 按 ADR-DEPS-002 "默认 feature" 注册，此处按需补开。
+# 远端 clone（http(s)/ssh）经 crate 级 `git-remote` feature 门控 gix
+# `blocking-network-client` + `blocking-http-transport-reqwest-rust-tls`（见 [features]），
+# 默认不开，避免在 ADR 默认 feature 之外引入网络栈。
+gix = { workspace = true, features = ["tree-editor"] }
+# CLIP 真实推理辅助（ADR-DEPS-005 真实接通）：image 做图像解码/resize（vision_model 预处理），
+# tokenizers 做 CLIP 文本 tokenizer（BPE 编码 → input_ids）。
+# 仅 media 组件（media_clip 的 CandleClipModel）真实推理路径 use 这些类型；
+# PlaceholderClipModel / 无 clip-cuda feature 编译不链接 image。
+# 注：权重 + tokenizer.json 由部署/运维预置到 model_dir（不入运行时触网依赖，
+# 便于离线 OS 部署 + 测试可复现）。
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "bmp"] }
+tokenizers = "0.21"
+# 真实 AEAD 加密（ADR-DEPS-003；workspace 已注册）。devtools 组件（impl_devtools）
+# 密钥 KVS 用其接通真实 AES-256-GCM 加密/解密（替代 ENC: 占位）：
+#   - aes-gcm：AES-256-GCM AEAD（nonce‖ciphertext‖tag 拼接存储）。
+#   - sha2：从固定种子派生 32 字节 AES-256 密钥（devtools 独立于系统密钥）。
+#   - rand_core：OsRng 生成每条密文独立 12 字节 GCM nonce（CSPRNG）。
+# 仅 devtools 组件 use 这些类型；对 backup/monitor/media/files/power 无 API 影响。
+aes-gcm.workspace = true
+sha2.workspace = true
+rand_core.workspace = true
+
+[dev-dependencies]
+# 测试时启用 os-storage 的 mock，供 impl_backup 的 ZfsBackupManager 单元测注入
+# MockStorageBackend（backup-agent 产出依赖此）。
+os-storage = { workspace = true, features = ["mock"] }
+# 临时目录（gix Git 仓库往返测试用）。本 crate 主依赖不引入 tempfile，
+# 仅测试需要（与 search_index/media_impl 自管 tempdir 的做法不同：git 仓库往返
+# 需要可清理的真实目录，tempfile 提供自动清理 + 互不干扰）。
+tempfile = "3"
+# 性能基准（criterion）：micro-benchmark tantivy 索引建立 + 查询。
+# workspace 已注册（dev-only）；不进入 release 产物。
+criterion.workspace = true
+
+# 性能基准：tantivy 全文搜索（建索引 + BM25 查询 + snippet 高亮）。
+# harness=false 让 criterion 提供自己的 main。
+[[bench]]
+name = "tantivy_search"
+path = "benches/tantivy_search.rs"
+harness = false

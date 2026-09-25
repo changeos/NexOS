@@ -1,0 +1,49 @@
+[package]
+name = "os-network"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 系统网络层：接口/VLAN/桥/绑定/防火墙/NAT + DHCP/PXE/DNS + IB-RoCE(RDMA) + DPU（接口契约，见规划文档 §3.9）"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+tokio.workspace = true
+# 真实接口管理执行层（rtnetlink 为纯 Rust netlink 绑定，无系统库 FFI 依赖，
+# 故无条件引入——只在调用时需 root/CAP_NET_ADMIN）。
+# 注：链路/地址消息解析复用 rtnetlink 的 re-export（`rtnetlink::packet_route`），
+# 避免直接注册 netlink-packet-route（保持 workspace 依赖最小集）。
+rtnetlink.workspace = true
+futures.workspace = true
+os-core.workspace = true
+os-common.workspace = true
+# 真实 nftables 执行层：nftnl 通过 nftnl-sys 链接 libnftnl（build script 用
+# pkg-config 找 `.pc`），缺 `-dev` 包时 `cargo build --features nftnl-ffi` 会失败
+# ——这是预期门控行为（见 docs/SANDBOX.md §5.3）。故作为可选依赖，仅在
+# `nftnl-ffi` feature 下编译进产物。
+nftnl = { workspace = true, optional = true }
+# mnl：libmnl FFI 高层封装（nftnl finalized batch 经 netlink socket 发送所需）。
+# 注意：nftnl 0.7 的 re-export 仅含 nftnl-sys（libnftnl FFI），**不含 mnl_socket**——
+# 故与 nettest 同走 `mnl` crate 的高层封装（Socket::new / send_all / cb_run）。
+# 与 nftnl 共存亡：同 FFI 依赖（libmnl-dev），故同在 `nftnl-ffi` feature 下启用。
+mnl = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[features]
+default = []
+# 提供 Mock* 实现（MockNetworkManager / MockFirewall / MockDhcpServer /
+# MockDnsServer / MockPxeServer），供下游 crate 单测/集成测注入（见
+# _conventions.md §5）。用法：`os-network = { workspace = true, features = ["mock"] }`
+# （仅 [dev-dependencies]）。
+mock = []
+# 真实 nftables 执行层（FFI）：启用后 `NftnlFirewallBackend` 进入编译，
+# 需宿主装 `libnftnl-dev` + `libmnl-dev`。沙箱镜像（scripts/sandbox/docker）
+# 已覆盖；普通开发机/CI 默认不开（缺 -dev 头时门控为编译失败）。
+nftnl-ffi = ["dep:nftnl", "dep:mnl"]

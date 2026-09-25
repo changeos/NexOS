@@ -1,0 +1,11 @@
+NAME="OS System"
+VERSION="0.1.0"
+ID=os-system
+ID_LIKE=os-system
+VERSION_ID=0.1.0
+PRETTY_NAME="OS System 0.1.0 (Rust)"
+ANSI_COLOR="0;36"
+HOME_URL="https://github.com/os-system/os"
+SUPPORT_URL="https://github.com/os-system/os/issues"
+BUG_REPORT_URL="https://github.com/os-system/os/issues"
+BUILD_ID="rootfs-template"

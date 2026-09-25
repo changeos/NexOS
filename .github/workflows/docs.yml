@@ -1,0 +1,146 @@
+# OS System - 文档构建与发布
+# `cargo doc --workspace --no-deps` 确认 pub API 文档可生成（不验证内容；内容由 docs-agent 维护）。
+# 生成的 HTML 经 artifact 上传，便于预览/部署（devops-agent §3 C1 docs 守护门 + doc deploy）。
+# 详见 docs/agents/devops-agent.md §3 CI/构建服务清单。
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # 手动触发：构建并上传文档产物。
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTDOCFLAGS: -D warnings
+
+# 同分支并发只跑最新一次。
+concurrency:
+  group: docs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cargo-doc:
+    name: cargo doc --workspace
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: docs-workspace
+          cache-targets: true
+
+      # rust-embed 在编译期要求 crates/os-api/static-dist/ 存在（os-api 内嵌 Vue3 产物），
+      # 而该目录被 .gitignore 排除（GitHub checkout 后不存在）——
+      # cargo doc 编译 os-api 之前必须先构建前端（与 make web 等价）。
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build web assets (rust-embed 依赖 static-dist)
+        working-directory: crates/os-api/web
+        run: |
+          npm ci
+          npm run build
+
+      - name: cargo doc --workspace
+        run: cargo doc --workspace --features mock --no-deps
+
+      # 打包文档 HTML（加顶层 index，避免点进 target/doc 才能看到入口）。
+      - name: Stage doc HTML
+        run: |
+          mkdir -p _site
+          cp -r target/doc/* _site/
+          cat > _site/index.html <<'HTML'
+          <!doctype html><html><head><meta charset="utf-8">
+          <title>OS System docs</title></head>
+          <body><h1>OS System docs</h1>
+          <p>各 crate 文档见同名子目录（如 <a href="os_core/">os_core</a>）。</p>
+          </body></html>
+          HTML
+
+      - name: Upload doc artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-${{ github.run_id }}
+          path: _site
+          if-no-files-found: error
+          retention-days: 30
+
+  # main 分支：把文档发布到 GitHub Pages（与 cargo-doc 门解耦，互不阻塞）。
+  deploy-pages:
+    name: deploy to GitHub Pages
+    needs: cargo-doc
+    # GitHub Pages 在免费版+私有仓库不可用（422 plan 限制）：私有仓库跳过部署，只构建文档。
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && github.event.repository.private == false
+    # Pages 部署需写权限。
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: docs-workspace
+          cache-targets: true
+
+      # 同 cargo-doc job：rust-embed 依赖被 gitignore 的 static-dist，doc 前先建前端。
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build web assets (rust-embed 依赖 static-dist)
+        working-directory: crates/os-api/web
+        run: |
+          npm ci
+          npm run build
+
+      - name: cargo doc --workspace
+        run: cargo doc --workspace --features mock --no-deps
+
+      - name: Stage doc HTML
+        run: |
+          mkdir -p _site
+          cp -r target/doc/* _site/
+          cat > _site/index.html <<'HTML'
+          <!doctype html><html><head><meta charset="utf-8">
+          <title>OS System docs</title></head>
+          <body><h1>OS System docs</h1>
+          <p>各 crate 文档见同名子目录（如 <a href="os_core/">os_core</a>）。</p>
+          </body></html>
+          HTML
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,28 @@
+[package]
+name = "os-im"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "OS 核心 IM：对话即操作入口 + AI agent 宿主 + 多 agent 协作运行时（见规划文档 §3.7）（接口契约）"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+tracing.workspace = true
+os-core.workspace = true
+os-common.workspace = true
+
+[features]
+# 默认不含 mock；下游测试启用以获得 MockLlmBackend / MockAgent / MockConversationStore /
+# MockSharedContext / MockConfirmationGate / MockTool / MockAgentOrchestrator（见 src/mock.rs）。
+mock = []
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "net", "io-util", "time"] }

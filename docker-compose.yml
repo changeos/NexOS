@@ -1,0 +1,44 @@
+# OS System —— Docker Compose 编排
+# =============================================================================
+#
+# 一键起一个完整 OS 容器（API 网关 @ :8080）。
+#
+#   docker compose up --build      # 构建并前台启动
+#   docker compose up -d --build   # 后台启动
+#   curl http://localhost:8080/healthz
+#   docker compose logs -f os
+#   docker compose down            # 停止（保留卷）
+#   docker compose down -v         # 停止并删除数据卷
+#
+# 特权模式说明：ZFS（zpool/zfs CLI + 内核模块）、nftables、cgroup v2 等真实内核
+# 操作需要 privileged + cgroupns=host。仅体验 HTTP API（/healthz、/api/v1/* 内存态
+# 路由）可去掉 privileged，但 ZFS/防火墙相关真实操作会失败。
+
+services:
+  os:
+    # 用项目根 Dockerfile 构建（多阶段：builder → debian-slim runtime）。
+    build: .
+    image: os-system:latest
+    container_name: os
+    # ZFS / nftables / cgroup v2 真实操作需特权 + 主机 cgroup namespace。
+    privileged: true
+    cgroup: host
+    ports:
+      - "8080:8080"        # osd --serve-api 0.0.0.0:8080（API 网关）
+    volumes:
+      - os-data:/data     # 持久化（元数据 / 配置 / ZFS loop backing）
+      # 真实 cgroup v2 操作时取消下行注释（与 scripts/sandbox/docker 对齐）：
+      # - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    # 默认 CMD 已是 ["--serve-api","0.0.0.0:8080"]；如需覆盖：
+    # command: ["osd", "--check"]
+    restart: unless-stopped
+    # 健康探针：网关 /healthz 端点（SystemRouteHandler）。
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  os-data:

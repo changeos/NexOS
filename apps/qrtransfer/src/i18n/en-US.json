@@ -1,0 +1,7 @@
+{
+  "qr": {
+    "title": "QR File Transfer",
+    "subtitle": "File → animated QR video (one QR code per frame) → decode back to file · for offline / air-gapped scenarios",
+    "openStandalone": "Open standalone in new tab"
+  }
+}

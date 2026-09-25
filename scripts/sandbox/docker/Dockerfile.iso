@@ -1,0 +1,89 @@
+# syntax=docker/dockerfile:1.7
+#
+# OS System —— ISO 构建沙箱镜像（真实 xorriso + mksquashfs 端到端测专用）
+# =============================================================================
+#
+# 目的：给 os-iso 的真实 ISO 构建测（`crates/os-iso/tests/real_xorriso_build.rs`，
+# 标 `#[ignore]`）提供一个开箱即用的、装齐 `xorriso` + `squashfs-tools` + Rust
+# 工具链的环境。这些测需要真实工具链，普通 GitHub Actions runner（ubuntu-latest）
+# 默认不装这两个包；本镜像用于「ISO 构建」可选 CI job / 本地沙箱回归。
+#
+# 与 `Dockerfile.test`（方案 A：systemd + privileged + ZFS/libvirt/nftables）的区别：
+# - 本镜像**极简**：只需 xorriso / squashfs-tools / Rust，无需 systemd / privileged /
+#   cgroup v2 / ZFS——ISO 构建是纯用户态 spawn，不碰内核设施。
+# - 因此可在普通非特权容器跑（`docker run` 无需 `--privileged`）。
+#
+# 红线（与 Dockerfile.test 一致）：本镜像只装运行环境，**不打包仓库源码**——源码经
+# `-v $PWD:/workspace` 挂入，保证镜像版本与仓库解耦。
+#
+# 构建：
+#   docker build -t os-iso-build:latest \
+#     -f scripts/sandbox/docker/Dockerfile.iso scripts/sandbox/docker
+#
+# 运行（跑真实 #[ignore] ISO 构建测）：
+#   docker run --rm -v "$PWD":/workspace:rw -w /workspace os-iso-build:latest \
+#     cargo test -p os-iso --features mock --test real_xorriso_build -- --ignored --nocapture
+#
+# 详见 docs/SANDBOX.md（ISO 工具链依赖） + docs/DEPLOYMENT.md §5.2（ISO 构建命令）。
+
+FROM ubuntu:24.04 AS base
+
+# 避免 apt 交互卡构建；UTF-8 locale。
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=UTC \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+# ---- 系统包：ISO 构建工具链 + 通用编译依赖 ----
+# xorriso：ISO9660 生成（XorrisoIsoBuilder::run_xorriso）。
+# squashfs-tools：提供 mksquashfs（XorrisoIsoBuilder::run_squashfs）。
+# coreutils：sha256sum（TokioIsoRunner::compute_sha256，通常已含，显式声明保险）。
+# ca-certificates / curl：拉 rustup。
+# pkg-config / build-essential：部分 crate FFI 编译（os-iso 本身无，但 workspace 整体编译需要）。
+# git：rust-cache / 部分构建脚本依赖。
+# locales：locale-gen C.UTF-8。
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        xorriso \
+        squashfs-tools \
+        coreutils \
+        ca-certificates \
+        curl \
+        pkg-config \
+        build-essential \
+        git \
+        locales \
+    && locale-gen C.UTF-8 \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- Rust 工具链：固定 stable（与 .github/workflows/ci.yml 对齐）----
+ENV RUSTUP_HOME=/opt/rust/rustup \
+    CARGO_HOME=/opt/rust/cargo \
+    PATH=/opt/rust/cargo/bin:$PATH \
+    RUST_BACKTRACE=short \
+    CARGO_TERM_COLOR=always
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --profile minimal --default-toolchain stable \
+               --component clippy rustfmt \
+    && rustup --version && cargo --version && rustc --version
+
+# sccache 加速重复编译（与 ci.yml 缓存策略一致）。
+RUN curl --proto '=https' --tlsv1.2 -sSfL \
+      https://github.com/mozilla/sccache/releases/latest/download/sccache-v0.8.0-x86_64-unknown-linux-musl.tar.gz \
+    | tar -xz --strip-components=1 -C /opt/rust/cargo/bin \
+         sccache-v0.8.0-x86_64-unknown-linux-musl/sccache \
+    && chmod +x /opt/rust/cargo/bin/sccache \
+    && sccache --version || true
+ENV RUSTC_WRAPPER=sccache \
+    SCCACHE_DIR=/workspace/.cache/sccache
+
+# ---- 工具链自检（构建期 fail-fast：若 xorriso/mksquashfs 装失败，镜像构建即报错）----
+RUN xorriso --version && mksquashfs -version && sha256sum --version
+
+# 工作目录（仓库经 -v 挂入；镜像本身不含源码）。
+WORKDIR /workspace
+RUN mkdir -p /workspace/.cache
+
+# 默认入口：跑真实 ISO 构建 #[ignore] 测。
+# 调用方可覆盖：docker run ... os-iso-build:latest <任意命令>
+CMD ["cargo", "test", "-p", "os-iso", "--features", "mock", "--test", "real_xorriso_build", "--", "--ignored", "--nocapture"]
